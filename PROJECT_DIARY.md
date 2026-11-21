@@ -60,3 +60,61 @@ Learn demand forecasting and operations research using NYC Yellow Taxi data.
 ### Working agreement
 - Continue in English, with useful grammar corrections.
 - User writes and runs the code; assistant guides step by step.
+
+
+## 2026-11-21 — Evening: deeper data-quality checks
+
+### Findings — January 2024 file
+- Total records: 2,964,624.
+- Negative durations: 56 (~0.00189%).
+- Missing pickup or drop-off timestamps: 0.
+- Zero durations: 814 (~0.02746%).
+
+Among the 814 zero-duration records:
+- Positive recorded distance: 56.
+- Different pickup and drop-off zone IDs: 630.
+- Positive total_amount: 760.
+- Zero total_amount: 50.
+- Negative total_amount: 4.
+- Missing total_amount: 0, inferred from the counts above.
+
+These checks overlap; their counts must not be added together.
+
+Pickup timestamp range:
+- Earliest: 2002-12-31 22:59:39.
+- Latest: 2024-02-01 00:01:15.
+
+The file contains pickup timestamps outside January 2024.
+Their count has not yet been calculated.
+
+### Interpretation
+- Positive amounts do not prove payment collection or a valid trip.
+- Different zone IDs do not prove actual movement.
+- Negative amounts might represent corrections or reversals;
+  this explanation remains unconfirmed.
+- Zero-duration records are unsuitable as reliable travel-duration
+  labels, but their usefulness for pickup forecasting needs
+  separate assessment.
+- Preserve raw records and compare demand counts with and without
+  flagged records before finalizing cleaning rules.
+- No cleaning filters have been applied to the source data.
+
+### Python and SQL practice
+- Combined conditions using AND and OR.
+- Used IS NULL, equality, inequality, MIN, and MAX.
+- Extracted scalar counts using .fetchall()[0][0].
+- Practiced organizing related checks into a class.
+- Reviewed __init__, self, indentation, and method arguments.
+- Use == for string value comparisons, not is.
+- Distinguished printing results from returning values.
+
+### Future extension discussed
+Compare forecast-driven optimization with learned heuristics
+after establishing reliable data, simulation, and baselines.
+
+### Next step
+Count pickups outside January 2024:
+- Earlier than 2024-01-01 00:00:00, OR
+- At or after 2024-02-01 00:00:00.
+
+Then inspect those records before choosing a date-filtering policy.
