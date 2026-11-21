@@ -133,7 +133,174 @@ def missing_timestamp_count(connection, file_path):
         FROM read_parquet('{file_path}')
         WHERE tpep_pickup_datetime IS NULL OR tpep_dropoff_datetime IS NULL;
         """).fetchall()[0][0]
-    
+   
+def count_zero_duration_trips(connection, file_path):
+
+    """Return number of the zero duration trips.
+
+    Args:
+        connection: An open DuckDB connection.
+        file_path: Path to a Parquet file.
+
+    Returns:
+        Int-> Number of zero duration trips 
+    """
+    return connection.sql(f"""
+        SELECT COUNT(*)
+        FROM read_parquet('{file_path}') 
+        WHERE tpep_pickup_datetime = tpep_dropoff_datetime;
+        """).fetchall()[0][0]
+
+def check_min_max_datetime(connection, file_path):
+
+     return connection.sql(f"""
+        SELECT  MIN(tpep_pickup_datetime) AS earliest_pickup,
+                MAX(tpep_pickup_datetime) AS latest_pickup
+        FROM read_parquet('{file_path}')   
+        """).show()
+
+class check_zero_duration_trips:
+
+    """Inspect trips with identical pickup and drop-off timestamps.
+        Args:
+            connection: An open DuckDB connection.
+            file_path: Path to a Parquet file.
+    """
+
+    def __init__(self, connection, file_path):
+
+        self.connection = connection
+        self.file_path = file_path
+        
+
+    def check_distance_and_total_amount(self, mode, type):
+
+        """
+            Args:
+                mode: select the mode in ['count', 'table', ]
+                type: select the type in ['non_zero_distance', 'non_zero_total_amount']
+            Returns: 
+                Int, if mode is count then number of zero duration in type.
+                None, Table of table of pickup_time, dropoff_time, trip_distance, fare_amount, PULocationID, DOLocationID, tip_amount, total_amount
+        
+        
+        """
+
+        if mode == "count":
+
+            if type is 'non_zero_distance':
+
+                count = self.connection.sql(f"""
+                    SELECT COUNT(*) AS non_zero_distance 
+
+                    FROM read_parquet('{self.file_path}')
+                    WHERE tpep_pickup_datetime = tpep_dropoff_datetime AND
+                        trip_distance > 0
+                    ;
+
+                    """).fetchall()[0][0]
+                
+                print(f"Number of zero duration trips with non zero distance is: {count}")
+                
+
+                return count
+            
+            elif type == 'non_zero_total_amount':
+                        
+                count = self.connection.sql(f"""
+                    SELECT  COUNT(*) AS non_zero_total_amount_count
+
+                    FROM read_parquet('{self.file_path}')
+                    WHERE tpep_pickup_datetime = tpep_dropoff_datetime AND
+                        total_amount > 0
+                    ;
+
+                    """).fetchall()[0][0]
+
+                print(f"Number of zero duration trips with non zero amount is: {count}")
+
+                return count
+
+            else:
+                raise ValueError("type must be 'non_zero_distance' or 'non_zero_total_amount'")
+            
+
+        elif mode == "table":
+
+            if type == 'non_zero_distance':
+
+                return self.connection.sql(f"""
+                    SELECT  tpep_pickup_datetime,
+                            tpep_dropoff_datetime,
+                            trip_distance, 
+                            fare_amount, 
+                            PULocationID, 
+                            DOLocationID
+
+                    FROM read_parquet('{self.file_path}')
+                    WHERE tpep_pickup_datetime = tpep_dropoff_datetime AND
+                        trip_distance > 0
+                    ;
+
+                    """).show()
+
+            elif type == 'non_zero_total_amount':
+            
+                            return self.connection.sql(f"""
+                                SELECT  trip_distance, 
+                                        fare_amount, 
+                                        tip_amount, 
+                                        total_amount
+            
+                                FROM read_parquet('{self.file_path}')
+                                WHERE tpep_pickup_datetime = tpep_dropoff_datetime AND
+                                    total_amount > 0
+                                ;
+            
+                                """).show()
+
+            else:
+                raise ValueError("type must be 'non_zero_distance' or 'non_zero_total_amount'")
+
+        else:
+            raise ValueError("mode must be 'count' or 'table'")
+
+    def pick_up_and_drop_off(self,mode):
+
+        if mode == "count":
+
+            count = self.connection.sql(f"""
+                SELECT COUNT(*) AS count 
+
+                FROM read_parquet('{self.file_path}')
+                WHERE PULocationID != DOLocationID AND 
+                tpep_pickup_datetime = tpep_dropoff_datetime
+
+                ;
+
+                """).fetchall()[0][0]
+            
+            print(f"Zero-duration trips with different zone IDs: {count}")
+
+        elif mode == 'table':
+
+                return self.connection.sql(f"""
+                    SELECT  trip_distance, 
+                            PULocationID,
+                            DOLocationID
+
+                    FROM read_parquet('{self.file_path}')
+                    WHERE PULocationID != DOLocationID AND 
+                    tpep_pickup_datetime = tpep_dropoff_datetime
+                    ;
+
+                    """).show()
+
+        else:
+            raise ValueError("mode must be 'count' or 'table'")
+
+         
+
 
 file_path = 'NYC_Yellow_Taxi/NYC_Yellow_Taxi_2024/yellow_tripdata_2024-01.parquet'
 connection = duckdb.connect()
@@ -144,5 +311,12 @@ number_of_total_trips = total_trips(connection, file_path)
 
 calculate_invalid_trip_percentage(invalid_trips, number_of_total_trips)
 missing_timestamp = missing_timestamp_count(connection, file_path)
+zero_duration_trips = count_zero_duration_trips(connection, file_path)
+print(number_of_total_trips)
 
-print(missing_timestamp)
+print(f"Trips with missing timestamps: {missing_timestamp}")
+print(f"Zero trips: {zero_duration_trips}, Zero duration trips percentage: {(zero_duration_trips/number_of_total_trips)*100}")
+function = check_zero_duration_trips(connection, file_path)
+function.check_distance_and_total_amount("table", "non_zero_distance")
+function.pick_up_and_drop_off("count")
+check_min_max_datetime(connection, file_path)
