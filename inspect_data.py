@@ -153,11 +153,112 @@ def count_zero_duration_trips(connection, file_path):
 
 def check_min_max_datetime(connection, file_path):
 
-     return connection.sql(f"""
+    """Return table of min max timestamp in given dataset.
+
+    Args:
+        connection: An open DuckDB connection.
+        file_path: Path to a Parquet file.
+
+    Returns:
+        None, table of min and max timestamp in given dataset 
+    """
+
+    return connection.sql(f"""
         SELECT  MIN(tpep_pickup_datetime) AS earliest_pickup,
                 MAX(tpep_pickup_datetime) AS latest_pickup
         FROM read_parquet('{file_path}')   
-        """).show()
+    """).show()
+
+def count_outside_month_trips(connection, file_path, mode):
+
+    """ Find the data in dataset where timestamp outside the month
+    Args:
+        connection: An open DuckDB connection.
+        file_path: Path to a Parquet file.
+        mode: 'table' or 'count'
+
+    Returns:
+        None, display the data if mode is table
+        int, the number of the trip outside boundary
+    
+    """
+
+    if mode == "count":
+        count = connection.sql(f"""
+                SELECT COUNT(*) AS count_outside_month_trips
+                FROM read_parquet('{file_path}')
+                WHERE tpep_pickup_datetime < '2024-01-01 00:00:00' OR
+                tpep_pickup_datetime >= '2024-02-01 00:00:00';
+                """).fetchall()[0][0]
+
+        print(f"Number of outside month trips: {count}")
+        return count
+
+    elif mode == "table":
+
+        connection.sql(f"""
+            SELECT  tpep_pickup_datetime,
+                    tpep_dropoff_datetime,
+                    PULocationID,
+                    DOLocationID,
+                    trip_distance
+
+            FROM read_parquet('{file_path}')
+            WHERE tpep_pickup_datetime < '2024-01-01 00:00:00' OR
+            tpep_pickup_datetime >= '2024-02-01 00:00:00'
+            ORDER BY tpep_pickup_datetime DESC;
+            """).show()
+
+    else:
+
+        raise ValueError("mode must be 'count' or 'table'") 
+
+
+def count_inside_month_trips(connection, file_path, mode):
+
+    """ Find the data in dataset where timestamp inside the month
+    Args:
+        connection: An open DuckDB connection.
+        file_path: Path to a Parquet file.
+        mode: 'table' or 'count'
+
+    Returns:
+        None, display the data if mode is table
+        int, the number of the trip inside boundary
+    
+    """
+
+
+    if mode == "count":
+        count = connection.sql(f"""
+                SELECT COUNT(*) AS count_inside_month_trips
+                FROM read_parquet('{file_path}')
+                WHERE tpep_pickup_datetime >= '2024-01-01 00:00:00' AND
+                tpep_pickup_datetime < '2024-02-01 00:00:00';
+                """).fetchall()[0][0]
+
+        print(f"Number of inside month trips: {count}")
+        return count
+
+    elif mode == "table":
+
+        connection.sql(f"""
+            SELECT  tpep_pickup_datetime,
+                    tpep_dropoff_datetime,
+                    PULocationID,
+                    DOLocationID,
+                    trip_distance
+
+            FROM read_parquet('{file_path}')
+            WHERE tpep_pickup_datetime >= '2024-01-01 00:00:00' AND
+            tpep_pickup_datetime < '2024-02-01 00:00:00'
+            ORDER BY tpep_pickup_datetime DESC;
+            """).show()
+
+    else:
+
+        raise ValueError("mode must be 'count' or 'table'")                                
+
 
 class check_zero_duration_trips:
 
@@ -317,6 +418,8 @@ print(number_of_total_trips)
 print(f"Trips with missing timestamps: {missing_timestamp}")
 print(f"Zero trips: {zero_duration_trips}, Zero duration trips percentage: {(zero_duration_trips/number_of_total_trips)*100}")
 function = check_zero_duration_trips(connection, file_path)
-function.check_distance_and_total_amount("table", "non_zero_distance")
+function.check_distance_and_total_amount("count", "non_zero_distance")
 function.pick_up_and_drop_off("count")
 check_min_max_datetime(connection, file_path)
+count_outside_month_trips(connection, file_path, "count")
+count_inside_month_trips(connection, file_path, "count")
