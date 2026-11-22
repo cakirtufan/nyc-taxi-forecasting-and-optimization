@@ -118,3 +118,48 @@ Count pickups outside January 2024:
 - At or after 2024-02-01 00:00:00.
 
 Then inspect those records before choosing a date-filtering policy.
+## 2026-11-22 - Date filtering and first daily pickup time series
+
+### Completed and verified
+- Counted 18 pickups outside January 2024: 10 on December 31, 2023;
+  3 on February 1, 2024; and 5 with dates in 2002 or 2009.
+- Two displayed old-date rows matched in the selected columns; exact
+  duplication across all columns has not been checked.
+- Counted 2,964,606 pickups inside January. Inside plus outside counts
+  reconcile to the original 2,964,624 records.
+- Used the half-open pickup interval: >= January 1 AND < February 1.
+- Agreed that a January pickup belongs to January even if drop-off is
+  in February. Boundary-adjacent trips are not automatically invalid.
+- Aggregated pickups by CAST(tpep_pickup_datetime AS DATE), using
+  COUNT(*), GROUP BY, and chronological ORDER BY.
+- Converted the aggregated DuckDB result to pandas using .df().
+- User verified 31 daily rows and a pickup_count sum of 2,964,606.
+- User reported producing the first daily pickup plot with matplotlib;
+  the plot itself was not shared for inspection.
+
+### Lessons and interpretation
+- Outside an interval uses OR; inside the interval uses AND.
+- .show() displays results and returns None; .fetchall()[0][0] extracts
+  a scalar, while .df() returns a pandas DataFrame.
+- DuckDB can aggregate millions of raw rows before transferring just
+  the 31 daily summary rows into pandas.
+- DuckDB's abbreviated display does not indicate missing dates;
+  .show(max_rows=31) displays all January daily rows.
+- Daily counts suggest a possible weekly pattern; more data is needed
+  to assess its consistency.
+- This is an exploratory date-filtered series, not a fully cleaned
+  dataset. Other quality flags and duplicate policy remain unresolved.
+
+### Next session
+- User proposed adding simple daily NYC weather data for January 2024.
+- Consider mean temperature, precipitation, and snowfall; select a
+  source and location representation, then join daily weather by date.
+- No weather data has been retrieved yet.
+- Observed historical weather is useful for exploration. Forecasting
+  must use weather information available at the prediction time to
+  avoid leakage.
+- Local AI autocomplete setup (Continue/Ollama) was deferred.
+
+### Working agreement
+- User writes and runs learning code; assistant guides step by step.
+- Continue primarily in English, with useful language corrections.

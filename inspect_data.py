@@ -1,4 +1,5 @@
 import duckdb
+import matplotlib.pyplot as plt
 
 def describe_database(connection, file_path):
 
@@ -214,6 +215,29 @@ def count_outside_month_trips(connection, file_path, mode):
         raise ValueError("mode must be 'count' or 'table'") 
 
 
+def count_trip_per_day(connection, file_path):
+
+    """ Counts the number of the trip per day in given month data
+    Args:
+        connection: An open DuckDB connection.
+        file_path: Path to a Parquet file.
+
+
+    Returns:
+        DataFrame 
+    """
+
+    return connection.sql(f"""
+        SELECT  CAST(tpep_pickup_datetime AS DATE) AS pickup_date,
+                COUNT(*) as pickup_count
+        FROM read_parquet('{file_path}')
+        WHERE tpep_pickup_datetime >= '2024-01-01 00:00:00' AND
+        tpep_pickup_datetime < '2024-02-01 00:00:00'
+        GROUP BY pickup_date
+        ORDER BY pickup_date;
+        """).df()
+
+
 def count_inside_month_trips(connection, file_path, mode):
 
     """ Find the data in dataset where timestamp inside the month
@@ -400,8 +424,6 @@ class check_zero_duration_trips:
         else:
             raise ValueError("mode must be 'count' or 'table'")
 
-         
-
 
 file_path = 'NYC_Yellow_Taxi/NYC_Yellow_Taxi_2024/yellow_tripdata_2024-01.parquet'
 connection = duckdb.connect()
@@ -423,3 +445,15 @@ function.pick_up_and_drop_off("count")
 check_min_max_datetime(connection, file_path)
 count_outside_month_trips(connection, file_path, "count")
 count_inside_month_trips(connection, file_path, "count")
+daily_counts = count_trip_per_day(connection, file_path)
+
+print(len(daily_counts))
+print(daily_counts["pickup_count"].sum())
+
+plt.plot(daily_counts["pickup_date"], daily_counts["pickup_count"])
+plt.xlabel("Pickup date")
+plt.ylabel("Recorded pickups")
+plt.title("Daily NYC Yellow Taxi pickups — January 2024")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
