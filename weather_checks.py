@@ -143,6 +143,6 @@ class weatherdata_interpreter:
                 "precipitation_sum (mm)" AS precipitation_mm,
                 "snowfall_sum (cm)" AS snowfall_cm
         FROM read_csv('{self.file_path}', skip=3, header=True)
-        WHERE time >= '2024-01-01' AND time < '2024-02-01'
+        WHERE time >= '{start_date}' AND time < '{end_date}'
         ORDER BY time; 
         """).df()
