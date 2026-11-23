@@ -163,3 +163,119 @@ Then inspect those records before choosing a date-filtering policy.
 ### Working agreement
 - User writes and runs learning code; assistant guides step by step.
 - Continue primarily in English, with useful language corrections.
+
+## 2026-11-23 - Weather integration, exploratory analysis, and monthly loader
+
+### Completed
+
+- Read the local 2024-2025 weather CSV with DuckDB, skipping three metadata
+  lines. Inspected daily mean temperature, precipitation, and snowfall.
+- Added weather inspection, coverage, NULL, range, hottest-date, and monthly
+  extraction methods. Monthly range checks now use the requested date interval;
+  the standalone NULL check still reads the full CSV. The loader checks missing
+  weather again on the actual joined monthly DataFrame.
+- Generalized month boundaries, including December rollover and leap years.
+  Corrected an accidental recursive call by separating the boundary helper
+  from the weather retrieval method.
+- Generalized taxi file paths with year and zero-padded month. Learned that
+  changing a date filter does not change the source file automatically.
+- Joined daily taxi counts to weather using pandas LEFT JOIN with
+  validate="one_to_one". Also practiced SQL INNER JOIN over pandas DataFrames.
+  DuckDB reads accessible DataFrame variable names; interpolating their printed
+  contents into an f-string is not a valid table reference.
+- January inputs had shapes (31, 2) and (31, 4); the pandas join had (31, 6)
+  with zero missing values. The SQL join displayed 31 rows and five columns.
+- February joined output had shape (29, 6), pickup sum 3,007,511, and matching
+  pickup/weather dates on every row, as reported by the learner.
+- Built get_data_frame(year, month) in inspect_data.py. It returns date,
+  pickup count, three weather variables, weekday, and pickup_deviation after
+  validation, or raises an error. The final version was reviewed, not executed
+  by the assistant; no final three-month run output was shared.
+
+### Recorded quality-check results
+
+| Check | January 2024 | February 2024 |
+| --- | ---: | ---: |
+| Pickups inside month | 2,964,606 | 3,007,511 |
+| Pickups outside month | 18 | 15 |
+| Zero-duration records in source file | 814 | 796 |
+| Zero-duration records with different zone IDs | 630 | 647 |
+| Daily rows | 31 | 29 |
+
+Zero-duration categories overlap. They remain quality flags, not automatic
+exclusions from the pickup series. February inside plus outside counts total
+3,007,526; this sum is not an independent raw-row-count validation.
+
+Full-CSV weather checks found zero NULL values in all three variables.
+Ranges were -11.7 to 34.1 degrees Celsius, 0 to 65.6 mm precipitation,
+and 0 to 18.13 cm snowfall. The hottest dates clustered in June/July 2025;
+their seasonal placement is not independent measurement verification.
+
+After correcting the range-check scope, February ranges were -2.6 to 13.3
+degrees Celsius, 0 to 26.1 mm precipitation, and 0 to 18.13 cm snowfall.
+The unchanged snowfall maximum can legitimately occur in February.
+
+### January weekday and weather exploration
+
+| Weekday | Mean daily pickups | Number of days |
+| --- | ---: | ---: |
+| Monday | 81,655.40 | 5 |
+| Sunday | 84,825.50 | 4 |
+| Tuesday | 92,732.40 | 5 |
+| Wednesday | 99,006.40 | 5 |
+| Friday | 102,147.00 | 4 |
+| Saturday | 105,289.50 | 4 |
+| Thursday | 107,146.75 | 4 |
+
+- Compared means rather than weekday totals because groups contain unequal
+  numbers of days. Eight of the ten lowest-count days were Sundays or Mondays.
+- Used groupby, agg(["mean", "count"]), and sorting after aggregation.
+- Used transform("mean") to align each weekday mean with the original rows.
+  pickup_deviation = pickup_count minus that month's weekday mean.
+  January 7's deviation was -17,282.5 pickups.
+- Inspected normalized time-series overlays, deviation over time, and
+  precipitation-versus-deviation scatter plots coloured by day of month.
+  Added labels, a zero reference line, and a colour bar.
+- Early January was mostly below its weekday baseline; January 22-31 was
+  above it. This remaining time pattern is not explained by weekday alone.
+- Precipitation versus pickup_deviation: Pearson -0.023742; Spearman -0.100938.
+  Conclusion: little linear or monotonic association in this January sample.
+  No significance test or causal analysis was performed.
+- Do not discard precipitation on this basis alone. Its predictive value
+  needs comparison on later unseen dates, with weather inputs available at
+  forecast time. Historical observed weather alone does not meet that condition.
+
+### Validation and Python lessons
+
+- LEFT JOIN preserves taxi days with missing weather; INNER JOIN drops them.
+- One-to-one validation prevents duplicate date keys from multiplying rows.
+- Use independent checks, not if/elif, when every condition must be evaluated.
+- Series comparisons require .all() or .any() to produce a single Boolean.
+  A DataFrame NULL check needs .any().any() to cover rows and columns.
+- Compare the joined pickup sum with inside_count, not inside plus outside.
+- Compare row count with (end_date - start_date).days. Together with the
+  existing month filters and unique date keys, this checks monthly coverage.
+- Printing results is not validation; failed checks must block the return.
+- Dividing by monthly maxima is only a plotting aid: Celsius ratios are not
+  physically meaningful, and an all-zero snowfall month creates a zero divisor.
+- Monthly weekday deviations use the same month's outcomes. They are not
+  out-of-sample errors and must not be used as contemporaneous forecast inputs.
+
+### Next session - exact stopping point
+
+1. Run the final get_data_frame function for January, February, and March 2024.
+   Calls are already present in main(); final execution results remain unconfirmed.
+2. Confirm successful returns with 31, 29, and 31 rows; record March totals.
+3. Concatenate into a chronological 91-day dataset and verify date coverage
+   and preservation of monthly totals. No combined dataset has been confirmed yet.
+4. Keep monthly deviations explicitly exploratory; plan chronological training
+   and evaluation before computing forecasting features or fitted baselines.
+5. Document the weather source/extraction settings and check daily time alignment.
+
+### Working agreement
+
+- The learner writes and runs learning code. Give goals and small hints first;
+  do not jump ahead with unsolicited code or full implementations.
+- Read current project files when context is uncertain instead of guessing or
+  asking the learner to repeat completed work.
+- Session ended at the learner's request; resume at the stopping point above.

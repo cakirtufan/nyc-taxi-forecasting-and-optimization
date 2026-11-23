@@ -87,7 +87,7 @@ class weatherdata_interpreter:
             ;
             """).show()       
 
-    def check_value_ranges(self):
+    def check_value_ranges(self, year, month):
 
         """ Display the number of min and max of the temp, precipitation and snowfall
 
@@ -95,6 +95,8 @@ class weatherdata_interpreter:
                 None, display table
 
         """
+
+        start_date, end_date = self.get_month_boundaries(year, month)
 
         self.connection.sql(f"""
             SELECT  MIN("temperature_2m_mean (°C)") as min_temp,
@@ -105,6 +107,7 @@ class weatherdata_interpreter:
                     MAX("snowfall_sum (cm)") as max_snowfall
 
             FROM read_csv('{self.file_path}', skip=3, header=True)
+            WHERE time >= '{start_date}' AND time < '{end_date}' 
             ;
             """).show()
 
@@ -135,7 +138,7 @@ class weatherdata_interpreter:
         """
 
         start_date, end_date = self.get_month_boundaries(year, month)
-        print(start_date, end_date)
+
 
         return self.connection.sql(f"""
         SELECT  time AS weather_date,

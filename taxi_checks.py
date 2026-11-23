@@ -170,12 +170,16 @@ class general_check_trips:
         Returns:
             Int-> Number of zero duration trips 
         """
-        return self.connection.sql(f"""
+
+        count = self.connection.sql(f"""
             SELECT COUNT(*)
             FROM read_parquet('{self.file_path}') 
             WHERE tpep_pickup_datetime = tpep_dropoff_datetime;
             """).fetchall()[0][0]
 
+        print(f"Number of the zero duration trips {count}")
+
+        return count
     def check_min_max_datetime(self):
 
         """Return table of min max timestamp in given dataset.
@@ -194,13 +198,14 @@ class general_check_trips:
             FROM read_parquet('{self.file_path}')   
         """).show()
 
-    def count_outside_month_trips(self, mode, year, month):
+    def count_month_trips(self, mode, year, month, boundary):
 
-        """ Find the data in dataset where timestamp outside the month
+        """ Find the data in dataset where timestamp given boundary
         Args:
             connection: An open DuckDB connection.
             file_path: Path to a Parquet file.
             mode: 'table' or 'count'
+            boundary: "inside", "outside"
 
         Returns:
             None, display the data if mode is table
@@ -210,83 +215,56 @@ class general_check_trips:
 
         start_date, end_date = self.get_month_boundaries(year, month)
 
-        if mode == "count":
-            count = self.connection.sql(f"""
-                    SELECT COUNT(*) AS count_outside_month_trips
-                    FROM read_parquet('{self.file_path}')
-                    WHERE tpep_pickup_datetime < '{start_date} 00:00:00' OR
-                    tpep_pickup_datetime >= '{end_date} 00:00:00';
-                    """).fetchall()[0][0]
+        def count_data(condition):
+            count_data = self.connection.sql(f"""
+                SELECT COUNT(*) AS count_outside_month_trips
+                FROM read_parquet('{self.file_path}')
+                {condition}
+                ;
+                """).fetchall()[0][0]
+            
+            return count_data
 
-            print(f"Number of outside month trips: {count}")
+        def table_data(condition):
+            table_data = self.connection.sql(f"""
+            SELECT  tpep_pickup_datetime,
+                    tpep_dropoff_datetime,
+                    PULocationID,
+                    DOLocationID,
+                    trip_distance
+
+            FROM read_parquet('{self.file_path}')
+            {condition}
+            ORDER BY tpep_pickup_datetime DESC;
+            """).show()
+
+        outside_condition = f"WHERE tpep_pickup_datetime < '{start_date} 00:00:00' OR tpep_pickup_datetime >= '{end_date} 00:00:00'"
+        inside_condition = f"WHERE tpep_pickup_datetime >= '{start_date} 00:00:00' AND tpep_pickup_datetime < '{end_date} 00:00:00'"    
+
+        if boundary == "inside":
+            condition = inside_condition
+        elif boundary == "outside":
+            condition = outside_condition
+        else:
+            raise ValueError("Boundary must be 'inside' or 'outside'")
+            
+
+        if mode == "count":
+
+            count = count_data(condition)
+
+            print(f"Number of {boundary} month trips: {count}")
             return count
 
         elif mode == "table":
 
-            self.connection.sql(f"""
-                SELECT  tpep_pickup_datetime,
-                        tpep_dropoff_datetime,
-                        PULocationID,
-                        DOLocationID,
-                        trip_distance
-
-                FROM read_parquet('{self.file_path}')
-                WHERE tpep_pickup_datetime < '{start_date} 00:00:00' OR
-                tpep_pickup_datetime >= '{end_date} 00:00:00'
-                ORDER BY tpep_pickup_datetime DESC;
-                """).show()
+            table_data(condition)
 
         else:
 
             raise ValueError("mode must be 'count' or 'table'") 
 
-
-    def count_inside_month_trips(self, mode, year, month):
-
-        """ Find the data in dataset where timestamp inside the month
-        Args:
-            connection: An open DuckDB connection.
-            file_path: Path to a Parquet file.
-            mode: 'table' or 'count'
-
-        Returns:
-            None, display the data if mode is table
-            int, the number of the trip inside boundary
-        
-        """
-
-        start_date, end_date = self.get_month_boundaries(year, month)
-
-        if mode == "count":
-            count = self.connection.sql(f"""
-                    SELECT COUNT(*) AS count_inside_month_trips
-                    FROM read_parquet('{self.file_path}')
-                    WHERE tpep_pickup_datetime >= '{start_date} 00:00:00' AND
-                    tpep_pickup_datetime < '{end_date} 00:00:00';
-                    """).fetchall()[0][0]
-
-            print(f"Number of inside month trips: {count}")
-            return count
-
-        elif mode == "table":
-
-            self.connection.sql(f"""
-                SELECT  tpep_pickup_datetime,
-                        tpep_dropoff_datetime,
-                        PULocationID,
-                        DOLocationID,
-                        trip_distance
-
-                FROM read_parquet('{self.file_path}')
-                WHERE tpep_pickup_datetime >= '{start_date} 00:00:00' AND
-                tpep_pickup_datetime < '{end_date} 00:00:00'
-                ORDER BY tpep_pickup_datetime DESC;
-                """).show()
-
-        else:
-
-            raise ValueError("mode must be 'count' or 'table'")   
-
+ 
     def count_trip_per_day(self, year, month):
 
         """ Counts the number of the trip per day in given month data
@@ -433,6 +411,8 @@ class check_zero_duration_trips:
                 """).fetchall()[0][0]
             
             print(f"Zero-duration trips with different zone IDs: {count}")
+
+            return count
 
         elif mode == 'table':
 
