@@ -322,3 +322,7 @@ clarifications when useful.
 Establish small forecasting baselines first, then measure how specific data
 cleaning choices change their errors. Raw-trip quality flags remain visible;
 additional exclusions will be evaluated rather than applied without comparison.
+
+---
+
+*Code written by a human. Docs polished by AI. Bugs are a team effort.*
