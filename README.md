@@ -8,6 +8,9 @@ skills in SQL, Python, time-series forecasting, and operations research.
 
 ## Project status
 
+See [Project Progress and Learning Roadmap](PROGRESS.md) for the eight work
+areas, implemented topics, remaining tasks, and next milestones.
+
 Daily pickup aggregation, weather integration, and weekday-mean forecasting
 baselines are implemented. Training windows were compared on March 2024,
 then the selected seven-day window was evaluated on April. A daily walk-forward
@@ -100,6 +103,27 @@ four. Whether that smoothing helps must be measured.
 3. **Forecasting:** establish simple baselines before testing more complex models.
 4. **Optimization:** define decision variables, objectives, and constraints.
 5. **Simulation:** compare forecast-driven decisions with simple heuristics.
+
+### Engineering roadmap
+
+The next milestone is an operable forecasting pipeline, not just a larger
+collection of models. After the pending rolling-window comparison and an
+initial SARIMA experiment, development will focus on:
+
+- Separate, configurable commands for data preparation, training, prediction,
+  and evaluation.
+- Reproducible environments and recorded data provenance, model artifacts,
+  experiment settings, and metrics.
+- Meaningful unit and integration tests, CI, input validation, logging,
+  and explicit failure handling.
+- Docker packaging and scheduled batch forecasts, with documented reruns
+  and recovery procedures.
+- Checks for run failures, stale or invalid inputs, and forecast performance
+  after actual counts become available.
+
+These capabilities are planned; the current implementation remains an
+experimental script with metric unit tests. An API will be added only if
+needed. Fleet optimization and simulation will build on this pipeline.
 
 ## Forecasting approaches: a learning reference
 

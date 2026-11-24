@@ -1,5 +1,67 @@
 # Project Diary
 
+## 2026-11-24 - Roadmap scope check
+
+Reviewed the roadmap for missing engineering and evaluation skills. Added
+continuous delivery/release validation separately from CI: versioned build,
+deployment, smoke test, and rollback. Added experiment design/A/B testing to
+the simulation stage, including metrics, randomization, uncertainty, and
+interference between fleet decisions. Historical or simulated comparisons
+will not be labelled live A/B experiments.
+
+Kept the near-term milestones unchanged. Explicitly made Kubernetes,
+distributed training, feature stores, and APIs optional rather than portfolio
+requirements. The priority remains one reproducible, operated batch workflow.
+
+## 2026-11-24 - Shared progress roadmap
+
+Added `PROGRESS.md`, an English roadmap based on the eight agreed areas:
+SQL/data engineering, EDA, statistics/forecasting, machine learning,
+mathematical optimization, algorithms/solvers, simulation/decisions, and
+software engineering/MLOps. Each topic records implementation status and
+evidence or remaining work; section outputs distinguish current deliverables
+from targets. Partial topics are not counted as complete.
+
+Added SARIMA/ETS explicitly and expanded engineering coverage to include CI,
+Docker, scheduled execution, monitoring, and recovery. The README links to
+the tracker, and the local learning agreement adopts it for future sessions.
+The immediate next step remains the pending 14-day rolling result, followed
+by SARIMA and packaging the first forecasting workflow. No code was changed.
+
+## 2026-11-24 - Project direction: engineering beyond experiments
+
+Clarified why this project matters: interviews are already happening, but
+recurring feedback concerns production-code experience and the scale of prior
+projects. The goal is therefore both forecasting/optimization practice and
+evidence that the resulting software can be reproduced, tested, run regularly,
+and diagnosed when something fails.
+
+Agreed next steps:
+
+1. Record the pending 14-day rolling-window results.
+2. Introduce SARIMA and compare it with a baseline using matching dates,
+   horizons, and update schedules.
+3. Package the first forecasting pipeline before expanding the model catalog:
+   separate preparation, training, prediction, and evaluation; add configuration
+   and clear commands.
+4. Build engineering practices into that workflow incrementally: dependency
+   and artifact tracking, meaningful tests and CI, logging and error handling,
+   Docker, scheduled batch execution, and checks for failed runs and forecast
+   performance. Document reruns and recovery as these capabilities are added.
+5. Add the MILP/OR-Tools decision layer and simulation on top of the forecasting
+   workflow, with explicit fleet assumptions and operational comparisons.
+
+These are planned capabilities, not completed work. No deployment, CI, or
+monitoring was added in this session. An API is optional; a dependable batch
+pipeline fits the initial use case. More models or a larger dataset alone do
+not establish production readiness.
+
+Updated the local learning agreement in `TRAINING_GOALS.md` so future sessions
+retain this priority. Continue with small learner-written tasks, not a wholesale
+rewrite or an infrastructure detour. The pending 14-day run remains the immediate
+starting point, followed by SARIMA. Earlier plans to keep expanding baseline
+experiments should not delay this sequence.
+
 ## 2026-11-24 - Evening: daily rolling forecasts and visual comparison
 
 ### Completed
