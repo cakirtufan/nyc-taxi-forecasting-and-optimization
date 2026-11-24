@@ -1,5 +1,185 @@
 # Project Diary
 
+## 2026-11-24 - Follow-up: metric validation and first unit tests
+
+Added `tests/test_metrics.py` and strengthened the metric helper before
+continuing with forecasting models. Renamed `caluclate_mae_and_bias` to
+`calculate_mae_and_bias` and updated both baseline callers. The helper now
+raises `ValueError` for NaN values, unequal lengths, empty inputs, and
+non-finite values. The April evaluation variable in `main()` is now `test_df`.
+
+### Tests reviewed and run
+
+| Test | Expected behavior |
+| --- | --- |
+| Known underprediction example | MAE 10 and bias -10 |
+| Empty inputs | Raise ValueError |
+| Different lengths | Raise ValueError |
+| Infinite prediction | Raise ValueError |
+| Single observation: prediction 100, actual 120 | MAE 20 and bias -20 |
+
+The assistant inspected the scripts and ran the five tests successfully with
+the local Anaconda Python: **5 passed**. The default shell Python did not have
+pytest installed; using the existing Anaconda environment resolved this without
+installing anything. The normal repository-root command is
+`python -m pytest tests/test_metrics.py -q` in that environment.
+
+These tests verify metric behavior using small synthetic Series, independently
+of the raw data files. They do not yet exercise the forecasting functions or
+the monthly loader. NaN rejection is implemented but lacks a dedicated test.
+The metric helper also assumes matching Series indexes: pandas subtraction
+aligns by labels, so equal lengths alone do not guarantee matching observations.
+This remains a review finding, not a fix made during the documentation update.
+The docstring's broad "array-like" description is wider than the current
+Series-based implementation supports.
+
+### Direction and stopping point
+
+Continue building small models before expanding raw-data cleaning. Later,
+compare errors before and after specific cleaning rules to measure their
+effect. This keeps the learning process connected to forecasting outcomes.
+The existing monthly date filter remains in place; other trip-quality flags
+have not become automatic exclusions.
+
+Daily walk-forward seasonal naive on March remains the next modeling step
+and has not been implemented. The five passing tests establish a starting
+point for code verification, not complete coverage. Review existing behavior
+in small steps rather than introducing a broad new testing or refactoring task.
+
+## 2026-11-24 - First forecasting baselines and April test
+
+### What we built
+
+Moved from exploratory plots to forecasts evaluated on later dates. The
+learner combined January-March into 91 chronological, unique daily rows
+with seven columns and 9,554,722 total pickups. March contributed 31 days
+and 3,582,605 pickups. The initial split was 60 training days in January-February
+and 31 validation days in March.
+
+Implemented three helpers in `inspect_data.py`:
+
+- `calculate_mae_and_bias`: returns mean absolute error and mean signed error
+  (the original spelling typo was corrected in the follow-up session).
+- `windowed_weekday_mean`: selects the 7, 14, or 28 calendar days immediately
+  before the first prediction date, calculates weekday averages, and maps
+  them to the evaluation dates.
+- `all_history_weekday_mean`: calculates weekday averages from all supplied
+  training history before the first prediction date.
+
+Both forecasting functions copy the input DataFrames, return predictions,
+and print metrics. They fit once per call and keep the seven weekday values
+fixed throughout the evaluation period. The windowed function was renamed
+from `rolling_window_weekday_mean` to avoid implying daily updates that are
+not implemented. Its printed label still uses the older wording.
+
+### March validation results
+
+All forecasts were made using history before March 1, with no actual March
+counts used to update predictions during the month.
+
+| Training history | MAE | Bias |
+| --- | ---: | ---: |
+| Last 7 days | 9,335.29 | -6,869.61 |
+| Last 14 days | 11,316.69 | -11,276.05 |
+| Last 28 days | 12,063.92 | -12,063.92 |
+| February only (29 days) | 12,338.38 | -12,338.38 |
+| January-February | 15,889.18 | -15,889.18 |
+
+The last seven days were February 23-29. Because each weekday appeared once,
+their weekday means reproduced the seasonal-naive forecast exactly: repeat
+the last observed week throughout March. Older observations increased
+underprediction in this experiment; this does not establish a universal
+advantage for short training windows.
+
+Inspected daily errors and grouped both signed and absolute errors by weekday:
+
+| Weekday | Seasonal-naive MAE | Bias |
+| --- | ---: | ---: |
+| Monday | 8,915.75 | -8,915.75 |
+| Tuesday | 6,317.00 | 6,317.00 |
+| Wednesday | 10,734.75 | -10,734.75 |
+| Thursday | 4,669.75 | -784.25 |
+| Friday | 18,094.40 | -18,094.40 |
+| Saturday | 10,041.80 | -7,970.20 |
+| Sunday | 5,232.80 | -5,232.80 |
+
+Every March Tuesday was overpredicted; Fridays were consistently
+underpredicted. Thursday's small bias concealed errors in both directions.
+These are diagnostics from one month, not established long-term patterns.
+
+### April test
+
+Selected the seven-day window using March, then loaded April and supplied
+January-March as training history. The function selected March 25-31 and
+forecast all of April without updates. The learner reported:
+
+- MAE: 7,992.166666666667 pickups/day.
+- Bias: -4,802.166666666667 pickups/day.
+
+Both overprediction and underprediction occurred, with net underprediction.
+The lower error than March is encouraging, but different months have different
+forecasting difficulty. April was held out for this selection and has now
+been inspected. Further development needs a later unseen final test period.
+The assistant reviewed the code and recorded learner-run outputs; it did not
+rerun the forecasting experiments.
+
+### Concepts clarified
+
+Training-window length, observation weights, forecast horizon, forecast
+refresh frequency, and retraining frequency are separate decisions. A model
+with lag inputs can accept new observations without changing its fitted
+parameters. Our weekday-mean baseline only changes its predictions when its
+weekday means are recalculated.
+
+MAE measures absolute error; bias measures signed error. Absolute bias cannot
+exceed MAE. Equality with negative bias means no overpredictions; a smaller
+absolute bias means errors occur in both directions. Correcting March's
+predictions using March's measured bias would not be a valid forecast made
+before March began.
+
+Data leakage became clear through a historical-testing example: the full
+DataFrame contains March 8's count, but a simulated forecast made on March 1
+must not see it. A later forecast can use it once available. Known calendar
+features and weather forecasts issued in advance are allowed; future actual
+counts and future observed weather are not. Comparing predictions with actual
+outcomes afterward is valid evaluation. The learner answered all five
+availability/leakage quiz questions correctly after clarifying answer order.
+
+### Python practice
+
+- Used `groupby` to estimate weekday means and `map` to assign predictions.
+- Used the minimum target date and `pd.Timedelta` to define training windows;
+  retained pandas timestamps for comparisons.
+- Learned why scalar `and` cannot combine pandas Boolean Series, and why
+  `&` needs separately parenthesized comparisons.
+- Chose two consecutive row filters as a readable alternative. Combining
+  two already filtered DataFrames with `&` is not Boolean row filtering.
+- Preserved original DataFrames with copies and added function docstrings.
+
+### Next session - exact stopping point
+
+Begin implementing **daily walk-forward seasonal naive on March**, predicting
+one day at a time using the actual count from seven days earlier. This has
+been discussed but not coded. For March 8, March 1's count becomes usable
+because the forecast is now made during March, not before the entire month.
+Assume historical counts are available by each forecast time and state that
+assumption explicitly.
+
+Start by returning the evaluation period to March and preparing chronologically
+ordered, unique, complete daily history. A seven-row lag corresponds to seven
+calendar days only when dates are complete. Compare results with the monthly
+fixed-origin baseline while acknowledging the different horizon and update
+schedule. Keep April's already observed results separate from development;
+choose a later untouched period for eventual final testing.
+
+The current `main()` still runs the April seven-day test. Some comments
+describe the earlier March split and need updating; the evaluation variable
+was renamed to `test_df` in the follow-up. Weather-source documentation remains open.
+
+Continue with small steps: the learner writes and runs code, the assistant
+reviews and explains. Use readable English documentation, useful language
+corrections, and Turkish explanations when requested.
+
 ## 2026-11-21 — Project reset
 
 ### Goal

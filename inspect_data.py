@@ -2,6 +2,8 @@ import duckdb
 import matplotlib.pyplot as plt
 from taxi_checks import general_check_trips, check_zero_duration_trips
 from weather_checks import weatherdata_interpreter
+import pandas as pd
+import numpy as np
 
 
 def display_in_sql(connection, daily_counts, daily_weather):
@@ -101,13 +103,165 @@ def get_data_frame(year, month):
     else:
         raise ValueError(f"Matching Date: {matching_dates}, Weather Complete: {weather_complete}, Count Match: {count_match}, Days Complete {days_complete}")
 
+def calculate_mae_and_bias(prediction, count):
+
+    """
+        Evaluate forecast accuracy using MAE and mean forecast bias.
+
+        Args:
+            prediction : array-like
+                Predicted demand values.
+
+            count : array-like
+                Actual observed demand values.
+
+        Returns:
+            mae : float
+                Mean Absolute Error.
+
+            bias : float
+                Mean Forecast Error (prediction - actual).
+
+    """
+
+
+
+    if prediction.isna().any() or count.isna().any():
+
+        raise ValueError("Data contains NaN values.")
+
+    if len(prediction) != len(count):
+
+        raise ValueError("Prediction and count not in same length")
+
+    if prediction.empty or count.empty:
+
+        raise ValueError("Prediction or count is empty")
+
+    if not np.isfinite(prediction).all() or not np.isfinite(count).all():
+
+        raise ValueError("Prediction or count has np.inf")
+
+   
+    mae = np.mean(np.abs(prediction - count))
+    bias = np.mean(prediction - count)
+
+    return mae, bias
+
+def all_history_weekday_mean(train_df, validation_df):
+
+    """
+        Predict daily taxi demand using an all-history
+        weekday mean baseline.
+
+        Args:
+            train_df : pd.DataFrame
+
+            validation_df : pd.DataFrame
+            
+        Returns:
+            pd.DataFrame
+                Validation dataset with an additional column:
+                'all_history_mean_prediction'.
+    """
+
+    earliest_prediction_date = validation_df["pickup_date"].min()
+
+    train_copy = train_df.copy()
+    valid_copy = validation_df.copy()
+
+    train_copy = train_copy[train_copy["pickup_date"] < earliest_prediction_date]
+
+    history_weekday_mean = train_copy.groupby("weekday")["pickup_count"].mean()
+    valid_copy["all_history_mean_prediction"] = valid_copy["weekday"].map(history_weekday_mean)
+
+    mae, bias = calculate_mae_and_bias(valid_copy["all_history_mean_prediction"], valid_copy["pickup_count"])
+
+    print(f"All History Model MAE: {mae} and BIAS:{bias} in all history training")
+
+    return valid_copy
+
+
+def windowed_weekday_mean(train_df, validation_df, window):
+
+    """
+        Predict demand by windowed weekday mean baseline.
+
+        Args
+        
+            train_df : pd.DataFrame
+                Historical daily pickup counts and weekday information.
+
+            validation_df : pd.DataFrame
+                Validation data containing pickup dates, weekdays,
+                and actual pickup counts.
+
+            window : int
+                Number of historical days used for prediction.
+                Supported values: 7, 14, 28.
+
+        Returns:
+
+            pd.DataFrame
+                Validation dataset with an additional column:
+                'weekday_mean_prediction'.
+    """
+
+    if window in [7,14,28]:
+
+        earliest_prediction_date = validation_df["pickup_date"].min()
+
+        window_start = earliest_prediction_date - pd.Timedelta(days = window)
+        window_start = window_start
+
+        valid_copy = validation_df.copy()
+        train_copy = train_df.copy()
+
+        windowed_train = train_copy[train_copy["pickup_date"] >= window_start]
+        windowed_train = windowed_train[windowed_train["pickup_date"] < earliest_prediction_date]
+
+
+        weekday_mean = windowed_train.groupby("weekday")["pickup_count"].mean()
+        valid_copy["weekday_mean_prediction"] = valid_copy["weekday"].map(weekday_mean) 
+
+        mae, bias = calculate_mae_and_bias(valid_copy["weekday_mean_prediction"], valid_copy["pickup_count"])
+
+        print(f"Rolling window weekday Mean Model MAE: {mae} and BIAS:{bias} with a {window} days training window")
+
+        return valid_copy
+
+    else:
+
+        raise ValueError("Please select training window in [7,14,28]")
+
+
 
 def main():
 
+
+    ### get the data from database
     january_df = get_data_frame(2024,1)
     febuary_df = get_data_frame(2024,2)
     march_df = get_data_frame(2024,3)
+    april_df = get_data_frame(2024,4)
 
+    ### combine them together
+    combined_df = pd.concat([january_df, febuary_df, march_df, april_df], ignore_index=True).sort_values(by=["pickup_date"])
+
+    ### check the shape, all pickupdates are uniq and monotonic increasing and sum of the counts 
+    print(combined_df.shape)
+    print(combined_df["pickup_date"].nunique())
+    print(combined_df["pickup_date"].is_monotonic_increasing)
+    print(combined_df["pickup_count"].sum())
+
+    ### filter the combined df and get the df between jan and feb
+    train_df = combined_df[combined_df["pickup_date"] < "2024-04-01"]
+
+    ### filter the combined df and get the data from march
+    test_df = combined_df[combined_df["pickup_date"] >= "2024-04-01"]
+
+
+    windowed_weekday_mean(train_df, test_df, window=7)
 
 
 if __name__ == "__main__":

@@ -8,11 +8,13 @@ skills in SQL, Python, time-series forecasting, and operations research.
 
 ## Project status
 
-Daily pickup aggregation and weather integration are implemented. January
-and February 2024 results have been inspected; a reusable monthly loader
-now checks the join before returning a pandas DataFrame. January weather
-and weekday patterns have been explored. Forecasting models and optimization
-workflows have not yet been implemented.
+Daily pickup aggregation, weather integration, and weekday-mean forecasting
+baselines are implemented. Training windows were compared on March 2024,
+then the selected seven-day window was evaluated on April. These experiments
+forecast an entire month at once, without updates during that month.
+Daily walk-forward evaluation is the next step; optimization is not yet implemented.
+The metric helper now rejects invalid inputs, with five unit tests covering
+basic calculations and selected edge cases.
 
 ### Current findings
 
@@ -29,9 +31,39 @@ has no predictive value or a causal effect.
 
 ### Next step
 
-Run the final monthly loader for January, February, and March 2024 and
-confirm 31, 29, and 31 rows. Combine them into a chronological 91-day
-dataset before proceeding to forecasting baselines and temporal validation.
+Implement daily walk-forward seasonal-naive forecasts on March: predict each
+day using the observed pickup count from seven days earlier, assuming it is
+available at forecast time. This changes both the forecast horizon and update
+schedule compared with the completed monthly forecasts. April has already
+been evaluated; reserve a later unseen period for final testing if further
+model development continues.
+
+### Forecasting results
+
+March validation used only observations available before March 1. Weekday
+means were calculated once and repeated throughout the month.
+
+| Training history | March MAE (pickups/day) | March bias (pickups/day) |
+| --- | ---: | ---: |
+| Last 7 days: February 23-29 | 9,335.29 | -6,869.61 |
+| Last 14 days | 11,316.69 | -11,276.05 |
+| Last 28 days | 12,063.92 | -12,063.92 |
+| February only (29 days) | 12,338.38 | -12,338.38 |
+| All available history: January-February | 15,889.18 | -15,889.18 |
+
+With seven complete daily observations, each weekday appears once. The
+seven-day weekday mean therefore equals a weekly seasonal-naive forecast.
+February-only and a 28-day window are different training samples in this leap year.
+
+The seven-day window was selected using March. For the April test, it used
+March 25-31 to predict all 30 April days, giving **MAE 7,992.17** and
+**bias -4,802.17** pickups/day. This is evidence for this baseline on April,
+not proof that seven days is always the best window. Lower April error also
+does not establish a model improvement: the evaluation month changed.
+
+MAE is the mean absolute prediction error. Bias is the mean of prediction
+minus actual count; negative bias indicates average underprediction.
+All results here were obtained and shared by the learner.
 
 ## Objectives
 
@@ -48,6 +80,100 @@ dataset before proceeding to forecasting baselines and temporal validation.
 3. **Forecasting:** establish simple baselines before testing more complex models.
 4. **Optimization:** define decision variables, objectives, and constraints.
 5. **Simulation:** compare forecast-driven decisions with simple heuristics.
+
+## Forecasting approaches: a learning reference
+
+There is no fixed number of approaches: choices about how we use the data
+can be combined with different forecasting models. The prediction horizon
+should reflect the operational decision; the training window is a modeling
+choice evaluated with chronological validation.
+
+### Questions to answer before choosing a model
+
+Start with the operational need, then choose and validate the modeling setup:
+
+1. **Forecast horizon:** How far ahead do we need predictions? For daily
+   data, one step means one day; multiple steps might mean the next seven days.
+2. **Forecast refresh frequency:** How often do we need fresh predictions:
+   daily, weekly, or monthly?
+3. **Training window and observation weights:** How much history should
+   influence the forecast? Should observations have equal weights, or should
+   recent observations receive more weight?
+4. **Model:** How do we turn that information into predictions?
+
+For example: "We allocate taxis each morning, so we need a forecast for the
+coming day, refreshed every morning. We will compare 28-day and 56-day
+training windows using chronological validation."
+
+Refreshing predictions and retraining the model are separate decisions.
+A fitted model can receive new inputs daily while being retrained weekly.
+Specify both schedules, and use only inputs available when each forecast
+is issued.
+
+### Forecasting setup
+
+| Setup choice | Approach | What it means |
+| --- | --- | --- |
+| Training window | Fixed historical window | Keep using January-February without adding new observations. |
+| Training window | Expanding window | Add newly observed days while keeping all earlier data. |
+| Training window | Rolling window | Always use the most recent fixed period, such as 28 days. |
+| Observation weighting | More weight on recent data | Retain older observations but reduce their influence. |
+| Forecast horizon | One step ahead | Predict tomorrow's daily pickups. |
+| Forecast horizon | Multiple steps ahead | Predict each of the next seven or 31 days. |
+| Forecast refresh frequency | Daily, weekly, monthly | Decide how often to issue fresh predictions using available inputs. |
+| Retraining frequency | Daily, weekly, monthly | Decide how often to refit the model using newly available observations. |
+
+For example, we can combine a rolling 28-day training window with daily
+updates and forecasts for the next seven days. Training-window length,
+forecast horizon, and update frequency are separate choices.
+
+### Forecasting models
+
+| Forecasting approach | Basic idea | Main limitation |
+| --- | --- | --- |
+| Weekday average | Use the training-period average for the target weekday. | Fixed weekday values do not follow changing levels automatically. |
+| Naive | Predict the latest observed value. | Ignores the weekly pattern. |
+| Seasonal naive | Use the most recent observed value for the same weekday; repeat the last observed week for longer horizons. | An unusual day can distort the forecast. |
+| Moving average | Predict using the average of recent days. | Smooths over weekday differences and lags behind changes. |
+| Exponential smoothing / ETS | Update level, and optionally trend and seasonality, giving more influence to recent observations. | Sudden changes and external effects can remain difficult. |
+| SARIMA / SARIMAX | Model time dependence and seasonal patterns, optionally with external variables. | Requires careful model specification. |
+| Regression: linear, Ridge, etc. | Learn relationships with weekday, trend, past pickups, and other features. | Performance depends on features and model assumptions. |
+| Tree models: boosting, random forest | Learn nonlinear relationships between forecasting features and pickups. | Standard trees struggle to extrapolate trends beyond training values. |
+| Neural forecasting models | Learn temporal relationships using neural networks. | Usually require more data and tuning than our small starting dataset. |
+
+A longer training window does not automatically teach a model trends or
+seasonality. A weekday-average model still learns just seven fixed values.
+Shorter windows can respond to changing levels, but fewer observations make
+the estimates more sensitive to unusual days.
+
+### Validation and comparison
+
+Our first experiment uses January-February to predict all March days from
+the end of February, without updating during March. A second version uses
+February alone. Both use the same March validation dates.
+
+Walk-forward validation repeats forecasting at several dates, always using
+only information available at each forecast date. Training windows and models
+should be compared on the same target dates, horizons, and update schedule.
+For example, a forecast issued at the end of February cannot use actual
+March pickups as lag inputs; daily forecasts issued during March can use
+earlier March observations once those observations become available.
+
+The fixed-origin seasonal-naive and weekday-average comparisons are complete,
+including an April test of the window selected on March. The implemented
+`windowed_weekday_mean` selects one window before the first target date;
+it does not advance the window during the call. `all_history_weekday_mean`
+uses all supplied history before that date. Rolling and expanding evaluation
+require advancing the forecast date and updating the available history.
+
+Leakage is about information availability at forecast time. A historical
+DataFrame already contains future outcomes relative to a simulated forecast
+date. A forecast issued on March 1 must not use March 8's actual count; a
+forecast issued on March 14 may use it once available. Target-day weekdays
+are known in advance, whereas target-day observed weather is not. An archived
+weather forecast issued before the prediction is a valid potential input.
+Using actual outcomes afterward to calculate MAE and bias is evaluation,
+not leakage.
 
 ## Data
 
@@ -80,9 +206,11 @@ simulation assumptions.
 
 - `README.md` — project overview.
 - `PROJECT_DIARY.md` — progress, lessons learned, and next steps.
-- `inspect_data.py` - monthly loading, validated pandas LEFT JOIN, and SQL join example.
+- `inspect_data.py` - validated monthly loading, weekday-mean baselines, MAE/bias,
+  and the current April evaluation entry point.
 - `taxi_checks.py` - trip-quality checks, month boundaries, and daily aggregation.
 - `weather_checks.py` - CSV inspection, weather checks, and monthly extraction.
+- `tests/test_metrics.py` - synthetic unit tests for MAE and forecast bias.
 - `NYC_Yellow_Taxi/` — local trip records and data dictionary.
 - `NYC_Weather_2024_2025/` - local daily weather CSV.
 
@@ -90,6 +218,28 @@ The monthly loader checks one-to-one date keys, matching dates, complete
 weather values, preservation of the inside-month pickup total, and the
 expected day count. It raises an error if validation fails. These checks
 do not establish that every raw trip or weather measurement is valid.
+
+## Tests
+
+Run from the repository root in the Python environment containing the project
+dependencies and `pytest`:
+
+```sh
+python -m pytest tests/test_metrics.py -q
+```
+
+The five tests check a known MAE/bias result, empty inputs, unequal lengths,
+an infinite prediction, and a single observation. All five passed on
+November 24, 2026 in the local Anaconda environment. They use synthetic
+pandas Series and do not load the taxi or weather files. Importing the
+project module still requires its dependencies: pandas, NumPy, DuckDB,
+and matplotlib.
+
+`calculate_mae_and_bias` rejects missing values, empty inputs, unequal lengths,
+and non-finite values. Its current implementation expects pandas Series with
+matching indexes. Missing-value rejection does not yet have a dedicated test,
+and index alignment is not explicitly validated. The suite currently tests
+metrics, not the forecasting functions, date boundaries, or the monthly loader.
 
 ## Learning approach
 
@@ -99,3 +249,7 @@ The learner writes and runs the code; the assistant explains the purpose,
 offers hints, and reviews attempts. Work one step at a time without providing
 unsolicited implementations. Sessions are primarily in English, with Turkish
 clarifications when useful.
+
+Establish small forecasting baselines first, then measure how specific data
+cleaning choices change their errors. Raw-trip quality flags remain visible;
+additional exclusions will be evaluated rather than applied without comparison.

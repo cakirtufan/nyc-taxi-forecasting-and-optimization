@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
 .venv/
+.vscode/
 TRAINING_GOALS.md
 NYC_Yellow_Taxi/
