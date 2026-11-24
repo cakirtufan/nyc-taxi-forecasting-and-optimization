@@ -124,8 +124,6 @@ def calculate_mae_and_bias(prediction, count):
 
     """
 
-
-
     if prediction.isna().any() or count.isna().any():
 
         raise ValueError("Data contains NaN values.")
@@ -179,10 +177,10 @@ def all_history_weekday_mean(train_df, validation_df):
 
     print(f"All History Model MAE: {mae} and BIAS:{bias} in all history training")
 
-    return valid_copy
+    return valid_copy, mae, bias
 
 
-def windowed_weekday_mean(train_df, validation_df, window):
+def windowed_weekday_mean(train_df, validation_df, window, verbose = True):
 
     """
         Predict demand by windowed weekday mean baseline.
@@ -226,9 +224,15 @@ def windowed_weekday_mean(train_df, validation_df, window):
 
         mae, bias = calculate_mae_and_bias(valid_copy["weekday_mean_prediction"], valid_copy["pickup_count"])
 
-        print(f"Rolling window weekday Mean Model MAE: {mae} and BIAS:{bias} with a {window} days training window")
+        if verbose:
 
-        return valid_copy
+            print(f"Rolling window weekday {earliest_prediction_date} Mean Model MAE: {mae} and BIAS:{bias} with a {window} days training window")
+        
+        else:
+
+            pass
+
+        return valid_copy, mae, bias
 
     else:
 
@@ -238,30 +242,53 @@ def windowed_weekday_mean(train_df, validation_df, window):
 
 def main():
 
-
-    ### get the data from database
     january_df = get_data_frame(2024,1)
     febuary_df = get_data_frame(2024,2)
     march_df = get_data_frame(2024,3)
     april_df = get_data_frame(2024,4)
 
-    ### combine them together
     combined_df = pd.concat([january_df, febuary_df, march_df, april_df], ignore_index=True).sort_values(by=["pickup_date"])
 
-    ### check the shape, all pickupdates are uniq and monotonic increasing and sum of the counts 
     print(combined_df.shape)
     print(combined_df["pickup_date"].nunique())
     print(combined_df["pickup_date"].is_monotonic_increasing)
     print(combined_df["pickup_count"].sum())
 
-    ### filter the combined df and get the df between jan and feb
-    train_df = combined_df[combined_df["pickup_date"] < "2024-04-01"]
+    train_df = combined_df[combined_df["pickup_date"] < april_df["pickup_date"].min()]
 
-    ### filter the combined df and get the data from march
-    test_df = combined_df[combined_df["pickup_date"] >= "2024-04-01"]
+    validation_df = combined_df[combined_df["pickup_date"] >= april_df["pickup_date"].min()]
 
 
-    windowed_weekday_mean(train_df, test_df, window=7)
+    df_all, mae_all, bias_all = all_history_weekday_mean(train_df, validation_df)
+
+    plt.plot(df_all["pickup_date"], df_all["all_history_mean_prediction"], label = "All History")
+    plt.plot(df_all["pickup_date"], df_all["pickup_count"], label = "Count")
+
+    df_window, mae_window, bias_window = windowed_weekday_mean(train_df, validation_df, window = 7)
+
+    plt.plot(df_window["pickup_date"], df_window["weekday_mean_prediction"], label = "Fixed 7-day baseline")
+
+    mae_list = []
+    bias_list = []
+    rolling_prediction = []
+
+    for date in validation_df["pickup_date"]:
+
+        target_date = validation_df[validation_df["pickup_date"] == date]  
+        history = combined_df[combined_df["pickup_date"] < date]
+
+        df, mae, bias = windowed_weekday_mean(history, target_date, window=14, verbose=False)
+        mae_list.append(mae)
+        bias_list.append(bias)
+        rolling_prediction.append(df["weekday_mean_prediction"].values[0])
+
+    print(f"Mean mae: {np.mean(mae_list)}")
+    print(f"Mean bias: {np.mean(bias_list)}")
+
+    plt.plot(validation_df["pickup_date"], rolling_prediction, label = "Daily rolling 14-day baseline.")
+    plt.legend()
+    plt.show()
+    
 
 
 if __name__ == "__main__":

@@ -10,9 +10,10 @@ skills in SQL, Python, time-series forecasting, and operations research.
 
 Daily pickup aggregation, weather integration, and weekday-mean forecasting
 baselines are implemented. Training windows were compared on March 2024,
-then the selected seven-day window was evaluated on April. These experiments
-forecast an entire month at once, without updates during that month.
-Daily walk-forward evaluation is the next step; optimization is not yet implemented.
+then the selected seven-day window was evaluated on April. A daily walk-forward
+loop now also evaluates April, recalculating weekday means from recent history
+before each target day. Fixed monthly and daily rolling forecasts have been
+compared numerically and plotted together. Optimization is not yet implemented.
 The metric helper now rejects invalid inputs, with five unit tests covering
 basic calculations and selected edge cases.
 
@@ -31,12 +32,11 @@ has no predictive value or a causal effect.
 
 ### Next step
 
-Implement daily walk-forward seasonal-naive forecasts on March: predict each
-day using the observed pickup count from seven days earlier, assuming it is
-available at forecast time. This changes both the forecast horizon and update
-schedule compared with the completed monthly forecasts. April has already
-been evaluated; reserve a later unseen period for final testing if further
-model development continues.
+Run and record the 14-day rolling-window experiment on April, then compare
+its MAE and bias with the seven-day rolling baseline. The current loop and
+plot label are already set to 14 days; no result has been recorded yet.
+April is now also used for development, so reserve a later unseen period
+for final evaluation after choosing the forecasting setup.
 
 ### Forecasting results
 
@@ -64,6 +64,26 @@ does not establish a model improvement: the evaluation month changed.
 MAE is the mean absolute prediction error. Bias is the mean of prediction
 minus actual count; negative bias indicates average underprediction.
 All results here were obtained and shared by the learner.
+
+### Fixed versus daily updated forecasts on April
+
+| Setup | Training history | April MAE | April bias |
+| --- | --- | ---: | ---: |
+| Fixed seven-day baseline | March 25-31, reused throughout April | 7,992.17 | -4,802.17 |
+| Daily rolling seven-day baseline | Seven days immediately before each target date | 9,208.87 | +674.67 |
+
+Daily updates brought bias closer to zero but increased MAE by about 15.2%.
+Balanced signed errors do not necessarily mean accurate predictions. This
+compares different operating schedules: a monthly forecast with horizons
+of 1-30 days versus refreshed one-day forecasts, assuming past counts are
+available at each forecast time.
+
+With complete daily data, the rolling seven-day prediction copies the count
+from the same weekday one week earlier. The plot shows April 11's peak
+reappearing in the prediction for April 18, when actual demand was lower.
+An unusual day can therefore affect the following week's forecast. A rolling
+14-day window averages two observations per weekday; a 28-day window averages
+four. Whether that smoothing helps must be measured.
 
 ## Objectives
 
@@ -165,6 +185,10 @@ including an April test of the window selected on March. The implemented
 it does not advance the window during the call. `all_history_weekday_mean`
 uses all supplied history before that date. Rolling and expanding evaluation
 require advancing the forecast date and updating the available history.
+The current daily loop does this by passing one target row and all earlier
+observations to `windowed_weekday_mean`, which selects the recent window.
+April was initially held out for the March-selected baseline but is now
+part of development as additional update schedules and windows are explored.
 
 Leakage is about information availability at forecast time. A historical
 DataFrame already contains future outcomes relative to a simulated forecast
@@ -207,7 +231,7 @@ simulation assumptions.
 - `README.md` — project overview.
 - `PROJECT_DIARY.md` — progress, lessons learned, and next steps.
 - `inspect_data.py` - validated monthly loading, weekday-mean baselines, MAE/bias,
-  and the current April evaluation entry point.
+  and the current April fixed/rolling comparison and plot.
 - `taxi_checks.py` - trip-quality checks, month boundaries, and daily aggregation.
 - `weather_checks.py` - CSV inspection, weather checks, and monthly extraction.
 - `tests/test_metrics.py` - synthetic unit tests for MAE and forecast bias.

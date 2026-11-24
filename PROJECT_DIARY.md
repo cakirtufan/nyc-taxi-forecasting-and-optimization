@@ -1,5 +1,71 @@
 # Project Diary
 
+## 2026-11-24 - Evening: daily rolling forecasts and visual comparison
+
+### Completed
+
+Implemented daily walk-forward forecasting by reusing `windowed_weekday_mean`.
+For each April date, the loop selects that single target row and history
+strictly before it. The function then selects the most recent training
+window. Earlier April observations can enter later forecasts once available;
+the target day's count is used only to evaluate the prediction.
+
+The experiment used April rather than the originally planned March period.
+The current variable is named `validation_df` and contains April. Since we
+are now exploring alternatives on April, it is no longer an untouched test
+set for subsequent model selection. Reserve a later unseen period for final
+evaluation.
+
+Both baseline functions now return the prediction DataFrame, MAE, and bias.
+The windowed function accepts `verbose=False` to suppress per-day output.
+The loop collects daily metrics and one prediction per target date. Averaging
+the daily metrics gives the overall metrics here because every call evaluates
+exactly one observation; unequal-sized batches would require weighting.
+
+### Recorded April results
+
+| Forecast schedule | MAE | Bias |
+| --- | ---: | ---: |
+| Fixed seven-day window, forecast April once | 7,992.166666666667 | -4,802.166666666667 |
+| Daily rolling seven-day window | 9,208.866666666667 | +674.6666666666666 |
+
+The learner ran and shared these outputs. Daily updates reduced the magnitude
+of bias but increased MAE by about 15.2%. For the objective of minimizing
+absolute daily error, the fixed forecast performed better on this month.
+This does not establish that monthly updates generally outperform daily
+updates: the horizons and information available differ between schedules.
+
+### Plot and interpretation
+
+Created and shared a four-line April plot: actual pickups, the fixed
+January-March weekday average, the fixed seven-day baseline, and the daily
+rolling seven-day baseline. The two seven-day forecasts coincide for April
+1-7 because both use the same previous-week weekday observations. After that,
+the rolling forecast starts using April counts while the fixed one keeps
+repeating March 25-31.
+
+The April 11 actual peak appears in the rolling forecast on April 18. This
+illustrates the seasonal-naive limitation: it repeats last week's unusual
+days without knowing whether they will recur. Discussed averaging two prior
+observations per weekday with a 14-day window, or four with 28 days, assuming
+complete daily coverage.
+
+### Exact stopping point
+
+The learner stopped for the day after discussing the 14-day comparison.
+The saved loop already uses `window=14`, and its plot label says
+"Daily rolling 14-day baseline." The fixed comparison remains at seven days.
+No 14-day rolling metrics or plot have been shared or verified yet.
+
+Next session: run the current script, record the 14-day rolling MAE and bias,
+and compare them with the seven-day rolling results above. Continue in small
+steps; do not restart the completed loop or jump into new models. Earlier
+entries describe the previous stopping points and are superseded by this one.
+
+Documentation was updated after reviewing the saved code. Forecasting code
+was not changed or rerun during this update. Existing docstrings still need
+to describe the tuple returns and the verbose argument.
+
 ## 2026-11-24 - Follow-up: metric validation and first unit tests
 
 Added `tests/test_metrics.py` and strengthened the metric helper before
