@@ -1,0 +1,16 @@
+{
+  "title": "NYC Taxi Demand Forecasting & Optimization",
+  "status": "In progress",
+  "summary": "An applied forecasting project exploring how recorded taxi pickups can support fleet planning. I use DuckDB and pandas to validate trip records, combine daily counts with weather data, and compare simple forecasts using chronological evaluation.",
+  "finding": "In an April experiment, daily updates reduced forecast bias but increased mean absolute error by 15.2% compared with a fixed monthly forecast. More frequent updates did not automatically improve accuracy.",
+  "completed": "Daily data validation, weather integration, weekday-mean baselines, daily walk-forward evaluation, and five metric unit tests.",
+  "next": "Evaluate longer rolling windows and reserve a later unseen period for final testing. Fleet assignment optimization is planned.",
+  "technologies": [
+    "Python",
+    "SQL",
+    "DuckDB",
+    "pandas",
+    "pytest"
+  ],
+  "updated": "2026-11-24"
+}
