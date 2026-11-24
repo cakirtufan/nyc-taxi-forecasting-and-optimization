@@ -241,6 +241,27 @@ matching indexes. Missing-value rejection does not yet have a dedicated test,
 and index alignment is not explicitly validated. The suite currently tests
 metrics, not the forecasting functions, date boundaries, or the monthly loader.
 
+## Code review approach
+
+The current baseline and metric code was reviewed against the following
+seven areas. The review combined manual inspection, checks against known
+results, and automated tests.
+
+| Review area | What was done |
+| --- | --- |
+| Logic review | Traced date filtering, weekday grouping, and prediction mapping. Confirmed the MAE and signed-bias formulas and checked that a complete seven-day weekday mean reproduces seasonal naive. |
+| Data validation | Checked date uniqueness, chronological order, monthly coverage, join consistency, and pickup totals. Added metric checks that reject missing, empty, unequal-length, or non-finite inputs. |
+| Edge case testing | Used small synthetic Series to check empty inputs, different lengths, an infinite prediction, and a single observation. Invalid cases must raise an error; a single valid observation must return the expected metrics. |
+| Unit testing | Added five pytest tests with explicit expected results or expected exceptions. All five passed in the local Anaconda environment. |
+| Data leakage check | Reviewed the training cutoff so only dates before the first prediction date contribute to weekday means. Kept March for window selection and used April for the subsequent test. Identified monthly pickup deviations and future observed weather as unsuitable forecast-time inputs. |
+| Code readability | Extracted reusable metric and baseline functions, added docstrings, used two readable date filters, and renamed the windowed function to reflect its actual behavior. Renamed the April evaluation dataset to `test_df`. |
+| Version control | Used Git status and diffs to inspect changes and recorded the baselines, metric tests, and documentation in a descriptive commit. Local taxi records remain excluded from version control. |
+
+The review also recorded remaining gaps: Series index alignment is not
+validated, NaN rejection has no dedicated test, and automated coverage does
+not yet include the forecasting functions or loader. Some comments, printed
+labels, and the metric input docstring still need to be aligned with the code.
+
 ## Learning approach
 
 Build the workflow step by step, explain assumptions, prevent data leakage,

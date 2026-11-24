@@ -1,14 +1,3 @@
-""""
-Logic review	
-Data validation	
-Edge case testing	
-Unit testing	
-Data leakage check	
-Code readability	
-Version control	
-"""
-
-
 import pandas as pd
 from inspect_data import calculate_mae_and_bias
 import pytest
