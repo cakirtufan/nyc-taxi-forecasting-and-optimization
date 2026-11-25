@@ -1,5 +1,38 @@
 # Project Diary
 
+## 2026-11-26 - Class extraction and fit/predict comparison
+
+Extracted loading helpers into `data_loader.py` and introduced
+`WeekdayMeanForecaster` in `mean_forecaster.py`. Added separate `fit` and
+`predict` methods; prediction requires target dates, not target pickup counts.
+The class still contains the older baseline and evaluation methods. Its
+20-configuration comparison does not yet use fit/predict internally.
+
+`inspect_data.py` now runs a focused experiment: seven-day training window,
+28-day forecast horizon, and updates every 14 days. It loads January-April,
+fits only on history before each origin, and evaluates available April dates.
+The last blocks are truncated; overlapping forecasts retain origin and lead day.
+
+Assistant ran the script successfully in the local Anaconda environment:
+
+| Evaluation | Forecast rows | MAE | Bias |
+| --- | ---: | ---: | ---: |
+| All issued forecasts | 46 | 8644.326087 | -853.717391 |
+| Latest forecast per target day | 30 | 9776.900000 | -1559.966667 |
+
+Assertions confirmed that fit/predict matches the old windowed method at
+every origin and target. Latest-per-day predictions also match the previous
+seven-day-window, 14-day-horizon/update evaluator. The two metric summaries
+answer different questions: all issued forecasts count overlapping targets
+multiple times, while latest-per-day evaluates one forecast per April date.
+This run is a regression comparison, not comprehensive automated test coverage.
+
+Resume by reviewing this experiment and the distinction between horizon and
+update interval. Then consolidate evaluation around fit/predict and simplify
+the class responsibilities before SARIMA. Constructor data and horizon remain
+from the transitional design; horizon is not used by fit/predict. The learner
+requested stopping for the night and committing this checkpoint.
+
 ## 2026-11-25 - Automated fixed, rolling, and expanding baseline comparison
 
 ### Completed and understood
