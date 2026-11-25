@@ -175,12 +175,10 @@ def all_history_weekday_mean(train_df, validation_df):
 
     mae, bias = calculate_mae_and_bias(valid_copy["all_history_mean_prediction"], valid_copy["pickup_count"])
 
-    print(f"All History Model MAE: {mae} and BIAS:{bias} in all history training")
-
     return valid_copy, mae, bias
 
 
-def windowed_weekday_mean(train_df, validation_df, window, verbose = True):
+def windowed_weekday_mean(train_df, validation_df, window, verbose = False):
 
     """
         Predict demand by windowed weekday mean baseline.
@@ -239,6 +237,192 @@ def windowed_weekday_mean(train_df, validation_df, window, verbose = True):
         raise ValueError("Please select training window in [7,14,28]")
 
 
+def walk_forward_evaluation(combined_df, validation_df, window, horizon, model):
+    """
+    Evaluate weekday-mean forecasts using rolling or expanding history.
+
+    At each forecast origin, use observations strictly before that date to
+    predict the next target block. Pool predictions and actual counts before
+    calculating metrics so each evaluated observation has equal weight.
+
+    Args:
+        combined_df (pd.DataFrame): Historical and evaluation observations
+            with datetime-like pickup_date, weekday, and pickup_count columns.
+        validation_df (pd.DataFrame): Nonempty target-period observations with
+            the same required columns and one row per consecutive calendar day.
+        window (int or None): Rolling history length in days: 7, 14, or 28.
+            Ignored for the history model; None may be used in that case.
+        horizon (int): Positive number of days to forecast per block. Also
+            determines how many daily rows to advance between forecast origins.
+            Boolean values are rejected.
+        model (str): 'windowed' uses the most recent window days; 'history'
+            uses all available earlier observations, giving expanding history.
+
+    Returns:
+        tuple: Prediction list in chronological target order, overall MAE,
+            and overall bias (prediction minus actual), in pickups per day.
+
+    Raises:
+        ValueError: If model or horizon is invalid, the windowed model receives
+            an unsupported window, or metric input validation fails.
+
+    Notes:
+        Target dates are sorted, but uniqueness and daily continuity are not
+        checked here. Historical counts must be available at each forecast
+        origin, with sufficient weekday coverage to produce predictions.
+        Final blocks shorter than horizon are included. Horizon and update
+        frequency are coupled; predictions are not fed back into history.
+    """
+
+    if model not in ["windowed", "history"]:
+        raise ValueError("Selected model not in ['windowed', 'history']")
+
+    if not isinstance(horizon, int) or isinstance(horizon, bool) or horizon < 1:
+        raise ValueError("Horizon must be a positive integer")
+
+    validation_df = validation_df.sort_values("pickup_date")
+
+    rolling_prediction = []
+    actual_values = []
+
+    for date in validation_df["pickup_date"].iloc[::horizon]:
+
+        target_dates = validation_df[
+            (validation_df["pickup_date"] >= date)
+            & (
+                validation_df["pickup_date"]
+                < date + pd.Timedelta(days=horizon)
+            )
+        ]
+
+        history = combined_df[combined_df["pickup_date"] < date]
+
+        if model == "windowed":
+
+            df, _, _ = windowed_weekday_mean(
+                history,
+                target_dates,
+                window=window,
+                verbose=False
+            )
+
+            rolling_prediction.extend(
+                df["weekday_mean_prediction"].tolist()
+            )
+
+        elif model == "history":
+
+            df, _, _ = all_history_weekday_mean(
+                history,
+                target_dates
+            )
+
+            rolling_prediction.extend(
+                df["all_history_mean_prediction"].tolist()
+            )
+
+        actual_values.extend(df["pickup_count"].tolist())
+
+    mae, bias = calculate_mae_and_bias(
+        pd.Series(rolling_prediction, dtype=float),
+        pd.Series(actual_values, dtype=float)
+    )
+
+    return rolling_prediction, mae, bias
+
+
+def compare_forecasting_baseline(combined_df, validation_df):
+    """
+    Compare 20 fixed, expanding, and rolling weekday-mean configurations.
+
+    Run one fixed all-history forecast, three fixed-window forecasts, four
+    expanding-history evaluations, and twelve rolling-window evaluations.
+    Training windows are 7, 14, and 28 days; walk-forward horizons and update
+    intervals are 1, 7, 14, and 28 days.
+
+    Args:
+        combined_df (pd.DataFrame): Available observations with datetime-like
+            pickup_date, weekday, and pickup_count columns. Each underlying
+            forecast filters out observations at or after its forecast origin.
+        validation_df (pd.DataFrame): Nonempty evaluation observations with
+            the same required columns and one row per consecutive calendar day.
+
+    Returns:
+        pd.DataFrame: One row per configuration, in execution order, containing
+            strategy, model, window, horizon, update_every, mae, and bias.
+            Fixed forecasts span the full validation date range without
+            updates. Non-applicable window and update_every values are null.
+            Metrics are in pickups per day; bias is prediction minus actual.
+
+    Notes:
+        Underlying functions require sufficient historical weekday coverage
+        and valid metric inputs; their exceptions propagate to the caller.
+        Walk-forward runs include partial final blocks and give each evaluated
+        day equal weight. Horizon and update frequency change together, so this
+        comparison does not isolate their individual effects. The returned
+        table is not sorted by performance.
+    """
+
+    windows = [7,14,28]
+    horizons = [1,7,14,28]
+    results = []
+
+    full_horizon = (validation_df["pickup_date"].max()-validation_df["pickup_date"].min()        
+    ).days +1
+
+    df, mae, bias = all_history_weekday_mean(combined_df, validation_df)
+
+    results.append({"strategy": "fixed",
+                   "model": "history",
+                   "window": None,
+                   "horizon": full_horizon,
+                   "update_every": None,
+                   "mae":mae,
+                   "bias":bias
+                   })
+
+    for window in windows:
+
+        df, mae, bias = windowed_weekday_mean(combined_df, validation_df, window, verbose = False)
+
+        results.append({"strategy": "fixed",
+                        "model": "windowed",
+                        "window": window,
+                        "horizon": full_horizon,
+                        "update_every": None,
+                        "mae":mae,
+                        "bias":bias
+                        })
+
+    for horizon in horizons:
+
+        df, mae, bias = walk_forward_evaluation(combined_df, validation_df, None, horizon, "history")
+        
+        results.append({
+            "strategy": "expanding",
+            "model": "history",
+            "window": None,
+            "horizon": horizon,
+            "update_every": horizon,
+            "mae": mae,
+            "bias": bias
+        })
+
+
+    for window in windows:
+        for horizon in horizons:
+            df, mae, bias = walk_forward_evaluation(combined_df, validation_df, window, horizon, "windowed")
+            results.append({
+                "strategy": "rolling",
+                "model": "windowed",
+                "window": window,
+                "horizon": horizon,
+                "update_every": horizon,
+                "mae": mae,
+                "bias": bias
+            })
+
+    return pd.DataFrame(results)
 
 def main():
 
@@ -249,46 +433,13 @@ def main():
 
     combined_df = pd.concat([january_df, febuary_df, march_df, april_df], ignore_index=True).sort_values(by=["pickup_date"])
 
-    print(combined_df.shape)
-    print(combined_df["pickup_date"].nunique())
-    print(combined_df["pickup_date"].is_monotonic_increasing)
-    print(combined_df["pickup_count"].sum())
-
-    train_df = combined_df[combined_df["pickup_date"] < april_df["pickup_date"].min()]
+    # train_df = combined_df[combined_df["pickup_date"] < april_df["pickup_date"].min()]
 
     validation_df = combined_df[combined_df["pickup_date"] >= april_df["pickup_date"].min()]
 
+    results_df = compare_forecasting_baseline(combined_df, validation_df)
 
-    df_all, mae_all, bias_all = all_history_weekday_mean(train_df, validation_df)
-
-    plt.plot(df_all["pickup_date"], df_all["all_history_mean_prediction"], label = "All History")
-    plt.plot(df_all["pickup_date"], df_all["pickup_count"], label = "Count")
-
-    df_window, mae_window, bias_window = windowed_weekday_mean(train_df, validation_df, window = 7)
-
-    plt.plot(df_window["pickup_date"], df_window["weekday_mean_prediction"], label = "Fixed 7-day baseline")
-
-    mae_list = []
-    bias_list = []
-    rolling_prediction = []
-
-    for date in validation_df["pickup_date"]:
-
-        target_date = validation_df[validation_df["pickup_date"] == date]  
-        history = combined_df[combined_df["pickup_date"] < date]
-
-        df, mae, bias = windowed_weekday_mean(history, target_date, window=14, verbose=False)
-        mae_list.append(mae)
-        bias_list.append(bias)
-        rolling_prediction.append(df["weekday_mean_prediction"].values[0])
-
-    print(f"Mean mae: {np.mean(mae_list)}")
-    print(f"Mean bias: {np.mean(bias_list)}")
-
-    plt.plot(validation_df["pickup_date"], rolling_prediction, label = "Daily rolling 14-day baseline.")
-    plt.legend()
-    plt.show()
-    
+    print(results_df.sort_values(by="mae"))
 
 
 if __name__ == "__main__":

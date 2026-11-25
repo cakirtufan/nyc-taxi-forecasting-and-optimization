@@ -1,5 +1,99 @@
 # Project Diary
 
+## 2026-11-25 - Automated fixed, rolling, and expanding baseline comparison
+
+### Completed and understood
+
+- Recorded daily rolling 14-day MAE 8,754.583333 and bias +469.85, about
+  4.9% lower MAE than daily rolling seven-day forecasts.
+- Traced weekday grouping and mapping: a 14-day window uses two previous
+  observations of the target weekday, not the mean of all fourteen days.
+- Distinguished training window, forecast horizon, and update frequency.
+  Advancing forecast origins enables walk-forward evaluation; retaining all
+  earlier history gives expanding windows, while trimming gives rolling windows.
+- Implemented `walk_forward_evaluation` with selectable history/windowed
+  models, half-open target intervals, and updates every `horizon` days.
+  History contains actual observations strictly before the forecast origin;
+  previous predictions are not fed back as observed history.
+- Fixed if/elif/else branching and prediction-column selection. Practiced
+  append versus extend and scalar versus iterable values.
+- Pooled all predictions and actual values before calculating MAE/bias.
+  Averaging unequal-sized block metrics without weighting would be incorrect.
+- Implemented `compare_forecasting_baseline`: four fixed, four expanding,
+  and twelve rolling configurations returned as a DataFrame, sorted by MAE
+  by the caller. Discussed structured experiment metadata and nested loops.
+
+### April 2024 results: all 20 configurations
+
+User-executed results below are preserved to six decimal places as shared.
+Bias is prediction minus actual; units are pickups/day. Fixed forecasts use
+only pre-April observations. Expanding histories start January 1. A dash
+means not applicable, rather than missing experimental data.
+
+| Strategy | Window (days) | Horizon (days) | Update every (days) | MAE | Bias |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Fixed history | — | 30 | — | 12992.097436 | -12909.882051 |
+| Fixed window | 7 | 30 | — | 7992.166667 | -4802.166667 |
+| Fixed window | 14 | 30 | — | 7329.383333 | -4378.716667 |
+| Fixed window | 28 | 30 | — | 6408.908333 | -2041.408333 |
+| Expanding | — | 1 | 1 | 11723.572644 | -11101.351811 |
+| Expanding | — | 7 | 7 | 11723.572644 | -11101.351811 |
+| Expanding | — | 14 | 14 | 12092.299889 | -11598.659889 |
+| Expanding | — | 28 | 28 | 12800.643137 | -12718.427753 |
+| Rolling | 7 | 1 | 1 | 9208.866667 | 674.666667 |
+| Rolling | 7 | 7 | 7 | 9208.866667 | 674.666667 |
+| Rolling | 7 | 14 | 14 | 9776.900000 | -1559.966667 |
+| Rolling | 7 | 28 | 28 | 8457.633333 | -5324.100000 |
+| Rolling | 14 | 1 | 1 | 8754.583333 | 469.850000 |
+| Rolling | 14 | 7 | 7 | 8754.583333 | 469.850000 |
+| Rolling | 14 | 14 | 14 | 9863.916667 | -94.950000 |
+| Rolling | 14 | 28 | 28 | 7476.950000 | -4550.116667 |
+| Rolling | 28 | 1 | 1 | 7309.966667 | -148.716667 |
+| Rolling | 28 | 7 | 7 | 7309.966667 | -148.716667 |
+| Rolling | 28 | 14 | 14 | 7239.966667 | -832.366667 |
+| Rolling | 28 | 28 | 28 | 6513.483333 | -1909.883333 |
+
+### Interpretation and limits
+
+- Fixed 28-day history had the lowest April MAE among the tested setups.
+  More history or more frequent updates did not guarantee better accuracy.
+- All-history forecasts substantially underpredicted April. The historical
+  weekday averages were below April outcomes on average; the cause is not
+  established by this comparison alone.
+- Small signed bias does not imply small daily error. Rolling window 14,
+  horizon 14 had bias -94.95 but MAE 9,863.916667.
+- Daily and weekly schedules matched for every tested history choice. With
+  this weekday-only model, no new same-weekday observation arrives between
+  the weekly forecast origin and each target day. Whole-week rolling windows
+  likewise retain the same relevant weekday observations. This equality
+  does not generally hold for other forecasting models.
+- Horizon and update interval are coupled. The benchmark compares operating
+  schedules, not isolated effects of horizon or update frequency.
+- Final blocks are truncated to available April dates. For example, a
+  28-day schedule predicts April 1-28, then April 29-30 using refreshed history;
+  it differs from the fixed full-month forecast on the final two dates.
+- The evaluator assumes complete, unique daily validation rows; positional
+  stepping is not a general solution for dates with gaps or duplicates.
+  Counts are assumed available by the next forecast origin.
+- April is development data after these comparisons. These are configurations
+  of the same model family; reserve an unseen later period for final evaluation.
+- Assistant reviewed the current implementation and learner-provided results.
+  No new automated forecasting tests or assistant rerun were performed in
+  this documentation update. Existing metric-test evidence remains dated
+  November 24; it does not cover the new evaluator.
+
+### Resume after the break
+
+Baseline automation and the 20-run comparison are complete. Next introduce
+SARIMA foundations, then compare an initial model with a baseline using
+matching target dates, horizons, and update schedules. Package the first
+forecasting workflow afterward, before expanding the model catalog or OR work.
+Separating update frequency from horizon remains an optional later refinement.
+
+The learner explicitly reaffirmed: guide in small steps and review their
+code; do not supply full implementations unless requested. Continue in Turkish
+when requested. Session paused after the comparison and documentation update.
+
 ## 2026-11-24 - Roadmap scope check
 
 Reviewed the roadmap for missing engineering and evaluation skills. Added

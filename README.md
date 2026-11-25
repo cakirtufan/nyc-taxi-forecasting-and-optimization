@@ -14,9 +14,9 @@ areas, implemented topics, remaining tasks, and next milestones.
 Daily pickup aggregation, weather integration, and weekday-mean forecasting
 baselines are implemented. Training windows were compared on March 2024,
 then the selected seven-day window was evaluated on April. A daily walk-forward
-loop now also evaluates April, recalculating weekday means from recent history
-before each target day. Fixed monthly and daily rolling forecasts have been
-compared numerically and plotted together. Optimization is not yet implemented.
+evaluator now also compares fixed, rolling, and expanding forecasts on April.
+An automated comparison produces a 20-row results table across training
+windows and forecast/update schedules. Optimization is not yet implemented.
 The metric helper now rejects invalid inputs, with five unit tests covering
 basic calculations and selected edge cases.
 
@@ -35,9 +35,9 @@ has no predictive value or a causal effect.
 
 ### Next step
 
-Run and record the 14-day rolling-window experiment on April, then compare
-its MAE and bias with the seven-day rolling baseline. The current loop and
-plot label are already set to 14 days; no result has been recorded yet.
+The 20-configuration baseline comparison is complete. Next, introduce SARIMA
+foundations and compare a first model with a baseline under matching target
+dates, forecast horizons, and update schedules.
 April is now also used for development, so reserve a later unseen period
 for final evaluation after choosing the forecasting setup.
 
@@ -86,7 +86,46 @@ from the same weekday one week earlier. The plot shows April 11's peak
 reappearing in the prediction for April 18, when actual demand was lower.
 An unusual day can therefore affect the following week's forecast. A rolling
 14-day window averages two observations per weekday; a 28-day window averages
-four. Whether that smoothing helps must be measured.
+four. In the daily April comparison, MAE decreased to 8,754.58 with 14 days
+and 7,309.97 with 28 days.
+
+### Automated April benchmark (November 25, 2026)
+
+`compare_forecasting_baseline` runs four fixed forecasts, four expanding
+configurations, and twelve rolling configurations. Rolling windows are
+7/14/28 days; walk-forward horizons are 1/7/14/28 days. The returned table
+records strategy, model, window, horizon, update_every, MAE, and bias.
+
+| Selected setup | April MAE | April bias |
+| --- | ---: | ---: |
+| Fixed 28-day window (best of these 20 runs) | 6,408.91 | -2,041.41 |
+| Rolling 28-day window, daily updates | 7,309.97 | -148.72 |
+| Rolling 14-day window, daily updates | 8,754.58 | +469.85 |
+| Rolling 7-day window, daily updates | 9,208.87 | +674.67 |
+| Expanding history, daily updates | 11,723.57 | -11,101.35 |
+| Fixed January-March history | 12,992.10 | -12,909.88 |
+
+Full results are in [Project Diary](PROJECT_DIARY.md). Results were run and
+shared by the learner. These are variants of one weekday-mean model family,
+not 20 distinct model families or evidence of general superiority.
+
+The current evaluator couples horizon and update frequency: a seven-day
+horizon is refreshed every seven days. It assumes complete, unique daily
+rows and historical counts available before each forecast. Final partial
+blocks are included. Predictions and actuals are pooled before metric
+calculation, giving each target day equal weight despite unequal block sizes.
+
+Daily and weekly schedules give identical predictions here: before a target
+weekday occurs, the intervening days add no new observation of that weekday.
+With complete daily data and these whole-week training windows, its weekday
+mean therefore remains unchanged. This is model-specific, not a general
+equivalence of daily and weekly forecasting.
+
+More history and more frequent updates did not necessarily improve April
+MAE. Near-zero bias can coexist with large absolute errors. April is now
+development data; retain a later unseen period for final evaluation. These
+schedule comparisons change both horizon and refresh frequency, so their
+separate effects have not been isolated.
 
 ## Objectives
 
@@ -107,7 +146,7 @@ four. Whether that smoothing helps must be measured.
 ### Engineering roadmap
 
 The next milestone is an operable forecasting pipeline, not just a larger
-collection of models. After the pending rolling-window comparison and an
+collection of models. Following the completed baseline comparison and an
 initial SARIMA experiment, development will focus on:
 
 - Separate, configurable commands for data preparation, training, prediction,
@@ -209,8 +248,9 @@ including an April test of the window selected on March. The implemented
 it does not advance the window during the call. `all_history_weekday_mean`
 uses all supplied history before that date. Rolling and expanding evaluation
 require advancing the forecast date and updating the available history.
-The current daily loop does this by passing one target row and all earlier
-observations to `windowed_weekday_mean`, which selects the recent window.
+`walk_forward_evaluation` advances through target blocks and passes earlier
+observations to either baseline function. The windowed model trims that
+history; the all-history model retains it, giving expanding evaluation.
 April was initially held out for the March-selected baseline but is now
 part of development as additional update schedules and windows are explored.
 
@@ -255,7 +295,7 @@ simulation assumptions.
 - `README.md` — project overview.
 - `PROJECT_DIARY.md` — progress, lessons learned, and next steps.
 - `inspect_data.py` - validated monthly loading, weekday-mean baselines, MAE/bias,
-  and the current April fixed/rolling comparison and plot.
+  walk-forward evaluation, and the automated April baseline comparison table.
 - `taxi_checks.py` - trip-quality checks, month boundaries, and daily aggregation.
 - `weather_checks.py` - CSV inspection, weather checks, and monthly extraction.
 - `tests/test_metrics.py` - synthetic unit tests for MAE and forecast bias.
