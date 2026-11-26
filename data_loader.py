@@ -1,5 +1,5 @@
 import duckdb
-from taxi_checks import general_check_trips, check_zero_duration_trips
+from taxi_checks import general_check_trips
 from weather_checks import weatherdata_interpreter
 
 def display_in_sql(connection, daily_counts, daily_weather):

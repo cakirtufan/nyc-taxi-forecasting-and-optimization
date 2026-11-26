@@ -1,6 +1,6 @@
 # Project Progress and Learning Roadmap
 
-Last reviewed: November 26, 2026.
+Last reviewed: November 27, 2026.
 
 This roadmap tracks the NYC taxi project from data preparation to forecasting,
 fleet decisions, and an operable software workflow. Status describes work
@@ -49,8 +49,8 @@ modelling hypotheses. **Current output:** plots and documented exploratory findi
 | MAE, RMSE, WAPE, and forecast bias | In progress | MAE and signed bias implemented and unit-tested for selected cases. RMSE and WAPE remain. |
 | Lag and rolling features | In progress | Rolling 7/14/28-day weekday means implemented; seven-day version reproduces the previous weekday count. General lag/rolling feature tables remain. |
 | Time-based splitting | Implemented | January-February trained March forecasts; a March-selected baseline was tested on April. April subsequently became development data. |
-| Walk-forward validation | Implemented | Horizon and update interval are separate. Overlapping forecast blocks are resolved to the latest origin per target day before MAE/bias; update intervals longer than the horizon are rejected. Assumes complete daily rows and available historical counts; forecasting edge cases lack automated coverage. |
-| Forecasting baselines | Implemented | Fixed all-history and 7/14/28-day means, expanding history, and rolling 7/14/28-day means compared on April. The 20 baseline plus 184 additional overlapping schedules total 204 configurations. Fixed 28-day history had lowest April MAE: 6,408.91. Details in diary. |
+| Walk-forward validation | Implemented | Horizon and update interval are separate. Overlapping forecast blocks are resolved to the latest origin per target day before MAE/bias; update intervals longer than the horizon are rejected. The comparison schedules have structural tests, but latest-origin selection and incomplete/irregular daily data still lack direct automated coverage. |
+| Forecasting baselines | Implemented | Fixed all-history and 7/14/28-day means, expanding history, and rolling 7/14/28-day means compared on April. The 20 baseline plus 184 additional overlapping schedules total 204 configurations; synthetic tests check these counts and selected schedule constraints. Fixed 28-day history had lowest April MAE: 6,408.91. Details in diary. |
 | ARIMA / SARIMA foundations | Planned | Study AR/MA terms, stationarity, differencing, and weekly seasonality; evaluate a first SARIMA model. |
 | Exponential smoothing / ETS | Planned | Evaluate level, trend, and seasonal smoothing when useful. |
 
@@ -120,12 +120,12 @@ Work on this section throughout the project, not only after modelling is finishe
 | Topic | Status | Evidence / remaining work |
 | --- | --- | --- |
 | Git and project architecture | In progress | Version control and reusable helpers are in use. Separate preparation, training, prediction, and evaluation stages remain. |
-| Unit and integration tests | In progress | Five metric unit tests passed. Forecasting, loader, and integration coverage remain. |
+| Unit and integration tests | In progress | Eleven pytest tests cover metric inputs, fit/predict weekday means and window choice, plus comparison counts, strategy mix, and update interval constraints. Direct walk-forward behavior, loader, and integration coverage remain. |
 | Reproducible experiments | In progress | Two comparison functions return configuration metadata and MAE/bias in DataFrames; 204 learner-run April results were inspected. Environment specification and persistent run/data/model artifact tracking remain. |
 | Configuration and logging | Planned | Replace hard-coded experiment choices with configuration and actionable run logs. |
 | Batch inference pipeline | Planned | Provide a repeatable command that writes forecasts with dates and model/run metadata. |
 | README and technical presentation | In progress | README, diary, and review approach documented. Final technical walkthrough remains. |
-| Continuous integration | Planned | Run meaningful automated checks on repository changes. |
+| Continuous integration | Implemented | GitHub Actions runs pytest with Python 3.13 on pushes and pull requests; the learner confirmed a passing run. This checks the current unit suite, not the data-dependent loader. |
 | Continuous delivery (CD) and release validation | Planned | Build a versioned deployable artifact after checks pass, release it to a chosen execution environment, run a smoke test, and document rollback. Start with a deliberate release step; automatic deployment of every change is not required. |
 | Docker and scheduled execution | Planned | Package and run the batch workflow on a documented schedule. |
 | Monitoring and recovery | Planned | Check failures, input freshness/quality, and later forecast performance; document safe reruns and model rollback. |
@@ -144,8 +144,8 @@ units, which this historical dataset alone cannot provide.
 
 ## Next milestones
 
-1. Completed November 26: separate horizon from update interval and compare 20 baseline plus 184 additional schedules, scoring the latest forecast per day.
-2. Learn SARIMA foundations and evaluate a first model against a baseline on matching dates and schedules.
+1. Completed November 26-27: separate horizon from update interval; compare 20 baseline plus 184 additional schedules; add synthetic pytest coverage and a passing GitHub Actions check.
+2. Learn SARIMA foundations and evaluate a first model against a baseline on matching dates and schedules. Add focused time-boundary tests as the evaluator evolves.
 3. Package and operate the first forecasting pipeline, progressively adding
    the engineering practices above before expanding the model catalog.
 4. Develop hourly/regional demand inputs and add MILP/OR-Tools and simulation.

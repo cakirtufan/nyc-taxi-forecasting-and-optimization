@@ -1,5 +1,27 @@
 # Project Diary
 
+## 2026-11-27 - Forecasting tests and GitHub Actions
+
+- Repaired the metric tests after `calculate_mae_and_bias` moved from the
+  exploratory script into `WeekdayMeanForecaster`. Importing `inspect_data.py`
+  had also executed the data-loading experiment during test collection.
+- Added synthetic fit/predict tests: empty training data, invalid training
+  window, a seven-day window using the most recent weekday value, and
+  all-history weekday means from two weeks of observations. Future target
+  dates contain no actual pickup counts.
+- Added a 28-day training and 30-day validation fixture for comparison tests.
+  The baseline comparison test checks 20 configurations (4 fixed, 4 expanding,
+  12 rolling). The additional-schedules test checks 184 rows and verifies
+  `update_every < horizon` for every returned configuration.
+- All 11 pytest tests passed locally. Added `.github/workflows/tests.yml` to
+  run pytest on pushes and pull requests using Python 3.13; the learner
+  confirmed that the GitHub Actions run also passed.
+
+These tests establish useful behavior and configuration checks. They do not
+yet directly test latest-origin selection in walk-forward evaluation, the
+monthly data loader, or performance on unseen taxi data. The learner wrote
+the test functions step by step and reviewed their expected outputs.
+
 ## 2026-11-26 - Independent update schedules and latest-forecast scoring
 
 The learner separated three choices: the training `window` (days of past
