@@ -1,16 +1,20 @@
 import pandas as pd
-from inspect_data import calculate_mae_and_bias
+from mean_forecaster import WeekdayMeanForecaster
 import pytest
 import numpy as np
+
+forecaster = WeekdayMeanForecaster(
+        df=None, validation_df=None, window=None, horizon=None
+        )
 
 def test_mae_and_bias():
 
     prediction = pd.Series([90, 110, 130])
     actual = pd.Series([100, 120, 140])
 
-    mae, bias = calculate_mae_and_bias(
-        prediction, actual
-    )
+
+    
+    mae, bias = forecaster.calculate_mae_and_bias(prediction, actual)
 
     assert mae == 10
     assert bias == -10
@@ -21,7 +25,7 @@ def test_empty_input():
     actual = pd.Series([], dtype=float)
 
     with pytest.raises(ValueError):
-        calculate_mae_and_bias(prediction, actual)
+        forecaster.calculate_mae_and_bias(prediction, actual)
 
 def test_different_lengths():
 
@@ -29,7 +33,7 @@ def test_different_lengths():
     actual = pd.Series([100, 120, 140])
 
     with pytest.raises(ValueError):
-        calculate_mae_and_bias(prediction, actual)
+        forecaster.calculate_mae_and_bias(prediction, actual)
 
 def test_infinite_values():
 
@@ -37,16 +41,14 @@ def test_infinite_values():
     actual = pd.Series([100, 120, 140])
 
     with pytest.raises(ValueError):
-        calculate_mae_and_bias(prediction, actual)
+        forecaster.calculate_mae_and_bias(prediction, actual)
 
 def test_single_observation():
 
     prediction = pd.Series([100])
     actual = pd.Series([120])
 
-    mae, bias = calculate_mae_and_bias(
-        prediction, actual
-    )
+    mae, bias = forecaster.calculate_mae_and_bias(prediction, actual)
 
     assert mae == 20
     assert bias == -20
