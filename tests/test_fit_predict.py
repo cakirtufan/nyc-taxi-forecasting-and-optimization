@@ -16,6 +16,20 @@ def make_synthetic_data():
     })
     return history, target
 
+def make_comparison_data():
+
+    dates = pd.date_range("2024-01-01", periods=58, freq="D")
+    counts = [10,20,30,40,50,60,70] * 8 + [10,20]
+
+    combined = pd.DataFrame({"pickup_date": dates, "pickup_count": counts})
+
+    combined["weekday"] = combined["pickup_date"].dt.day_name()
+
+    history = combined.iloc[:28].copy()
+    target = combined.iloc[28:].copy()
+
+    return history, target, combined
+
 def test_fit_empty():
 
     forecaster = WeekdayMeanForecaster(
@@ -37,7 +51,7 @@ def test_fit_invalid_window():
     with pytest.raises(ValueError):
         forecaster.fit(history=history)
 
-def test_weekday_check():
+def test_seven_day_window():
 
     train, target = make_synthetic_data()
 
@@ -64,6 +78,29 @@ def test_train_mean():
 
     assert prediction.tolist() == [20,40]
 
+def test_compare_forecasting_baseline_has_20_configurations():
+
+    _, target, combined = make_comparison_data()
+
+    forecaster = WeekdayMeanForecaster(
+            df=combined, validation_df=target, window=None, horizon=None
+            )
+
+    df = forecaster.compare_forecasting_baseline()
+    
+    assert len(df) == 20
+    assert df["strategy"].value_counts().to_dict() == {"rolling": 12, "fixed": 4, "expanding": 4}
+
+def test_additional_update_schedules_has_184_configurations():
 
 
+    _, target, combined = make_comparison_data()
 
+    forecaster = WeekdayMeanForecaster(
+            df=combined, validation_df=target, window=None, horizon=None
+            )
+
+    df = forecaster.compare_additional_update_schedules()
+
+    assert len(df) == 184
+    assert (df["update_every"] < df["horizon"]).all()
