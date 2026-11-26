@@ -19,19 +19,6 @@ whose update interval is shorter than their forecast horizon. The walk-forward
 evaluator selects the latest issued forecast for each target day before
 computing MAE and bias. Fleet optimization is not yet implemented.
 
-### Current findings
-
-| Month | Pickups inside month | Records outside month | Daily rows |
-| --- | ---: | ---: | ---: |
-| January 2024 | 2,964,606 | 18 | 31 |
-| February 2024 | 3,007,511 | 15 | 29 |
-
-January Mondays and Sundays had lower average pickups than other weekdays.
-Precipitation had little association with deviations from the January
-weekday averages: Pearson r = -0.023742 and Spearman rho = -0.100938.
-These are exploratory results from 31 days, not evidence that precipitation
-has no predictive value or a causal effect.
-
 ### Next step
 
 Introduce SARIMA foundations, then compare a first model with a weekday-mean
