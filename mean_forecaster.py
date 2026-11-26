@@ -103,14 +103,14 @@ class WeekdayMeanForecaster:
         return valid_copy, mae, bias
 
     def walk_forward_evaluation(
-        self, history, target, window, horizon, model
+        self, history, target, window, horizon, update_every, model
     ):
 
         """
         Evaluate rolling or expanding weekday-mean forecasts.
 
-        Horizon also sets the update interval. Assumes one row per
-        consecutive validation day and historical counts available at
+        If update every is NaN horizon also sets the update interval. 
+        Assumes one row per consecutive validation day and historical counts available at
         each forecast origin. Includes partial final blocks and computes
         metrics over all individual predictions.
         """
@@ -127,13 +127,28 @@ class WeekdayMeanForecaster:
         ):
             raise ValueError("Horizon must be a positive integer")
 
+        if update_every is None:
+            update_every = horizon
+
+        if (
+
+            not isinstance(update_every, int)
+            or isinstance(update_every, bool)
+            or update_every < 1
+        ):
+
+            raise ValueError("Update every must be a positive integer")
+
+        if update_every > horizon:
+            raise ValueError("update_every cannot exceed horizon")
+
+
         validation_df = target.copy().sort_values("pickup_date")
         combined_df = history.copy()
 
-        rolling_prediction = []
-        actual_values = []
+        forecast_blocs = []
 
-        for date in validation_df["pickup_date"].iloc[::horizon]:
+        for date in validation_df["pickup_date"].iloc[::update_every]:
 
             target_dates = validation_df[
                 (validation_df["pickup_date"] >= date)
@@ -142,6 +157,11 @@ class WeekdayMeanForecaster:
                     < date + pd.Timedelta(days=horizon)
                 )
             ]
+
+            block = target_dates[["pickup_date"]].copy()
+            block["forecast_origin"] = date
+            block["pickup_count"] = target_dates["pickup_count"]
+            
 
             available_history = combined_df[
                 combined_df["pickup_date"] < date
@@ -156,9 +176,8 @@ class WeekdayMeanForecaster:
                     verbose=False
                 )
 
-                rolling_prediction.extend(
-                    df["weekday_mean_prediction"].tolist()
-                )
+
+                block["prediction"] = df["weekday_mean_prediction"]
 
             elif model == "history":
 
@@ -167,18 +186,27 @@ class WeekdayMeanForecaster:
                     target=target_dates
                 )
 
-                rolling_prediction.extend(
-                    df["all_history_mean_prediction"].tolist()
-                )
 
-            actual_values.extend(df["pickup_count"].tolist())
+                block["prediction"] = df["all_history_mean_prediction"]
+                
+
+            forecast_blocs.append(block)
+
+
+
+        forecast_df = pd.concat(forecast_blocs, ignore_index=True)
+
+        latest = (forecast_df.sort_values(["pickup_date", "forecast_origin"])
+                  .drop_duplicates("pickup_date", keep = "last")
+                  .reset_index(drop = True))
 
         mae, bias = self.calculate_mae_and_bias(
-            pd.Series(rolling_prediction, dtype=float),
-            pd.Series(actual_values, dtype=float)
+            latest["prediction"],
+            latest["pickup_count"]
         )
 
-        return rolling_prediction, mae, bias
+
+        return latest, mae, bias
 
     def compare_forecasting_baseline(self):
 
@@ -237,6 +265,7 @@ class WeekdayMeanForecaster:
                 target=validation_df,
                 window=None,
                 horizon=horizon,
+                update_every=horizon,
                 model="history"
             )
 
@@ -258,6 +287,7 @@ class WeekdayMeanForecaster:
                     target=validation_df,
                     window=window,
                     horizon=horizon,
+                    update_every=horizon,
                     model="windowed"
                 )
 
@@ -271,7 +301,85 @@ class WeekdayMeanForecaster:
                     "bias": bias
                 })
 
-        return pd.DataFrame(results)
+        return pd.DataFrame(results).sort_values(by="mae")
+
+    def compare_additional_update_schedules(self):
+
+        """
+            Compare rolling and expanding schedules with updates more frequent
+            than the forecast horizon.
+
+            Tries 7-, 14-, and 28-day rolling windows and all-history expanding
+            forecasts. Returns a DataFrame sorted by MAE. Each target day is scored
+            once using its most recently issued forecast.
+        """
+
+        combined_df = self.df
+        validation_df = self.validation_df
+
+        results_w = []
+        results_h = []
+
+        for window in [7,14,28]:
+            for horizon in [1,7,14,28]:
+                for update in range(1, len(validation_df)):
+
+                    if update >= horizon:
+
+                        continue
+
+                    else:
+                        _, mae, bias = self.walk_forward_evaluation(history=combined_df,
+                                    target=validation_df,
+                                    window=window,
+                                    horizon=horizon,
+                                    update_every=update,
+                                    model="windowed"
+                                )
+
+                        results_w.append({
+                            "strategy": "rolling",
+                            "model": "windowed",
+                            "window": window,
+                            "horizon": horizon,
+                            "update_every": update,
+                            "mae": mae,
+                            "bias": bias
+                        })
+
+
+        walkthroug_windowed_updaterange = pd.DataFrame(results_w)
+                        
+
+        for horizon in [1,7,14,28]:
+            for update in range(1, len(validation_df)):
+            
+                if update >= horizon:
+
+                    continue
+
+                else:
+                    _, mae, bias = self.walk_forward_evaluation(history=combined_df,
+                    target=validation_df,
+                    window=None,
+                    horizon=horizon,
+                    update_every=update,
+                    model="history"
+                    )
+
+                    results_h.append({
+                        "strategy": "expanding",
+                        "model": "history",
+                        "window": None,
+                        "horizon": horizon,
+                        "update_every": update,
+                        "mae": mae,
+                        "bias": bias
+                    })
+
+        walkthroug_history_updaterange = pd.DataFrame(results_h)
+
+        return pd.concat([walkthroug_history_updaterange, walkthroug_windowed_updaterange]).sort_values(by="mae")
 
     def fit(self, history):
 
