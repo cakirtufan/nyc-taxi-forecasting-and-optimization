@@ -1,6 +1,6 @@
 # Project Progress and Learning Roadmap
 
-Last reviewed: November 25, 2026.
+Last reviewed: November 26, 2026.
 
 This roadmap tracks the NYC taxi project from data preparation to forecasting,
 fleet decisions, and an operable software workflow. Status describes work
@@ -49,13 +49,14 @@ modelling hypotheses. **Current output:** plots and documented exploratory findi
 | MAE, RMSE, WAPE, and forecast bias | In progress | MAE and signed bias implemented and unit-tested for selected cases. RMSE and WAPE remain. |
 | Lag and rolling features | In progress | Rolling 7/14/28-day weekday means implemented; seven-day version reproduces the previous weekday count. General lag/rolling feature tables remain. |
 | Time-based splitting | Implemented | January-February trained March forecasts; a March-selected baseline was tested on April. April subsequently became development data. |
-| Walk-forward validation | Implemented | Fixed, expanding, and rolling setups compared in 20 automated runs. Walk-forward target blocks use only earlier history; pooled metrics weight each day equally. Horizon and update interval are coupled at 1/7/14/28 days; partial final blocks included. Assumes complete daily rows and available historical counts. |
-| Forecasting baselines | Implemented | Fixed all-history and 7/14/28-day means, expanding history, and rolling 7/14/28-day means compared on April. Fixed 28-day history had lowest April MAE: 6,408.91. Full 20-run results in diary. |
+| Walk-forward validation | Implemented | Horizon and update interval are separate. Overlapping forecast blocks are resolved to the latest origin per target day before MAE/bias; update intervals longer than the horizon are rejected. Assumes complete daily rows and available historical counts; forecasting edge cases lack automated coverage. |
+| Forecasting baselines | Implemented | Fixed all-history and 7/14/28-day means, expanding history, and rolling 7/14/28-day means compared on April. The 20 baseline plus 184 additional overlapping schedules total 204 configurations. Fixed 28-day history had lowest April MAE: 6,408.91. Details in diary. |
 | ARIMA / SARIMA foundations | Planned | Study AR/MA terms, stationarity, differencing, and weekly seasonality; evaluate a first SARIMA model. |
 | Exponential smoothing / ETS | Planned | Evaluate level, trend, and seasonal smoothing when useful. |
 
 **Target output:** a reproducible forecasting benchmark without future-information
-leakage. **Current output:** automated 20-configuration fixed, expanding, and rolling benchmark on April.
+leakage. **Current output:** 204 weekday-mean schedule configurations on April,
+with latest-forecast-per-day scoring. April is development data.
 Use matching target dates, horizons, and refresh schedules for model comparisons;
 reserve a later unseen period for final evaluation.
 
@@ -120,7 +121,7 @@ Work on this section throughout the project, not only after modelling is finishe
 | --- | --- | --- |
 | Git and project architecture | In progress | Version control and reusable helpers are in use. Separate preparation, training, prediction, and evaluation stages remain. |
 | Unit and integration tests | In progress | Five metric unit tests passed. Forecasting, loader, and integration coverage remain. |
-| Reproducible experiments | In progress | Comparison function returns configuration metadata and MAE/bias in a DataFrame; 20 learner-run results documented. Environment specification and persistent run/data/model artifact tracking remain. |
+| Reproducible experiments | In progress | Two comparison functions return configuration metadata and MAE/bias in DataFrames; 204 learner-run April results were inspected. Environment specification and persistent run/data/model artifact tracking remain. |
 | Configuration and logging | Planned | Replace hard-coded experiment choices with configuration and actionable run logs. |
 | Batch inference pipeline | Planned | Provide a repeatable command that writes forecasts with dates and model/run metadata. |
 | README and technical presentation | In progress | README, diary, and review approach documented. Final technical walkthrough remains. |
@@ -143,8 +144,8 @@ units, which this historical dataset alone cannot provide.
 
 ## Next milestones
 
-1. Completed November 25: automate and record the 20-configuration baseline comparison (including rolling 14-day and expanding windows).
-2. Learn SARIMA foundations and evaluate a first model against the baseline.
+1. Completed November 26: separate horizon from update interval and compare 20 baseline plus 184 additional schedules, scoring the latest forecast per day.
+2. Learn SARIMA foundations and evaluate a first model against a baseline on matching dates and schedules.
 3. Package and operate the first forecasting pipeline, progressively adding
    the engineering practices above before expanding the model catalog.
 4. Develop hourly/regional demand inputs and add MILP/OR-Tools and simulation.

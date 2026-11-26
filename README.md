@@ -12,13 +12,12 @@ See [Project Progress and Learning Roadmap](PROGRESS.md) for the eight work
 areas, implemented topics, remaining tasks, and next milestones.
 
 Daily pickup aggregation, weather integration, and weekday-mean forecasting
-baselines are implemented. Training windows were compared on March 2024,
-then the selected seven-day window was evaluated on April. A daily walk-forward
-evaluator now also compares fixed, rolling, and expanding forecasts on April.
-An automated comparison produces a 20-row results table across training
-windows and forecast/update schedules. Optimization is not yet implemented.
-The metric helper now rejects invalid inputs, with five unit tests covering
-basic calculations and selected edge cases.
+baselines are implemented. Chronological experiments used March for initial
+window selection and April for development. The baseline grid compares 20
+fixed, rolling, and expanding schedules; a second grid adds 184 schedules
+whose update interval is shorter than their forecast horizon. The walk-forward
+evaluator selects the latest issued forecast for each target day before
+computing MAE and bias. Fleet optimization is not yet implemented.
 
 ### Current findings
 
@@ -35,97 +34,32 @@ has no predictive value or a causal effect.
 
 ### Next step
 
-The 20-configuration baseline comparison is complete. Next, introduce SARIMA
-foundations and compare a first model with a baseline under matching target
-dates, forecast horizons, and update schedules.
-April is now also used for development, so reserve a later unseen period
-for final evaluation after choosing the forecasting setup.
+Introduce SARIMA foundations, then compare a first model with a weekday-mean
+baseline on matching target dates and forecast/update schedules. Reserve a
+later unseen period for final evaluation; April has become development data.
 
-### Forecasting results
+### Forecasting snapshot
 
-March validation used only observations available before March 1. Weekday
-means were calculated once and repeated throughout the month.
+The weekday-mean model learns one average per weekday from either all
+available history or the latest 7, 14, or 28 days. The seven-day version
+equals a weekly seasonal-naive forecast when daily observations are complete.
+MAE measures average absolute error in recorded pickups; signed bias is
+prediction minus actual. Neither metric directly measures missed customers.
 
-| Training history | March MAE (pickups/day) | March bias (pickups/day) |
+| April 2024 setup | MAE (pickups/day) | Bias (pickups/day) |
 | --- | ---: | ---: |
-| Last 7 days: February 23-29 | 9,335.29 | -6,869.61 |
-| Last 14 days | 11,316.69 | -11,276.05 |
-| Last 28 days | 12,063.92 | -12,063.92 |
-| February only (29 days) | 12,338.38 | -12,338.38 |
-| All available history: January-February | 15,889.18 | -15,889.18 |
-
-With seven complete daily observations, each weekday appears once. The
-seven-day weekday mean therefore equals a weekly seasonal-naive forecast.
-February-only and a 28-day window are different training samples in this leap year.
-
-The seven-day window was selected using March. For the April test, it used
-March 25-31 to predict all 30 April days, giving **MAE 7,992.17** and
-**bias -4,802.17** pickups/day. This is evidence for this baseline on April,
-not proof that seven days is always the best window. Lower April error also
-does not establish a model improvement: the evaluation month changed.
-
-MAE is the mean absolute prediction error. Bias is the mean of prediction
-minus actual count; negative bias indicates average underprediction.
-All results here were obtained and shared by the learner.
-
-### Fixed versus daily updated forecasts on April
-
-| Setup | Training history | April MAE | April bias |
-| --- | --- | ---: | ---: |
-| Fixed seven-day baseline | March 25-31, reused throughout April | 7,992.17 | -4,802.17 |
-| Daily rolling seven-day baseline | Seven days immediately before each target date | 9,208.87 | +674.67 |
-
-Daily updates brought bias closer to zero but increased MAE by about 15.2%.
-Balanced signed errors do not necessarily mean accurate predictions. This
-compares different operating schedules: a monthly forecast with horizons
-of 1-30 days versus refreshed one-day forecasts, assuming past counts are
-available at each forecast time.
-
-With complete daily data, the rolling seven-day prediction copies the count
-from the same weekday one week earlier. The plot shows April 11's peak
-reappearing in the prediction for April 18, when actual demand was lower.
-An unusual day can therefore affect the following week's forecast. A rolling
-14-day window averages two observations per weekday; a 28-day window averages
-four. In the daily April comparison, MAE decreased to 8,754.58 with 14 days
-and 7,309.97 with 28 days.
-
-### Automated April benchmark (November 25, 2026)
-
-`compare_forecasting_baseline` runs four fixed forecasts, four expanding
-configurations, and twelve rolling configurations. Rolling windows are
-7/14/28 days; walk-forward horizons are 1/7/14/28 days. The returned table
-records strategy, model, window, horizon, update_every, MAE, and bias.
-
-| Selected setup | April MAE | April bias |
-| --- | ---: | ---: |
-| Fixed 28-day window (best of these 20 runs) | 6,408.91 | -2,041.41 |
+| Fixed 28-day window, one full-month forecast | 6,408.91 | -2,041.41 |
 | Rolling 28-day window, daily updates | 7,309.97 | -148.72 |
-| Rolling 14-day window, daily updates | 8,754.58 | +469.85 |
-| Rolling 7-day window, daily updates | 9,208.87 | +674.67 |
 | Expanding history, daily updates | 11,723.57 | -11,101.35 |
-| Fixed January-March history | 12,992.10 | -12,909.88 |
 
-Full results are in [Project Diary](PROJECT_DIARY.md). Results were run and
-shared by the learner. These are variants of one weekday-mean model family,
-not 20 distinct model families or evidence of general superiority.
-
-The current evaluator couples horizon and update frequency: a seven-day
-horizon is refreshed every seven days. It assumes complete, unique daily
-rows and historical counts available before each forecast. Final partial
-blocks are included. Predictions and actuals are pooled before metric
-calculation, giving each target day equal weight despite unequal block sizes.
-
-Daily and weekly schedules give identical predictions here: before a target
-weekday occurs, the intervening days add no new observation of that weekday.
-With complete daily data and these whole-week training windows, its weekday
-mean therefore remains unchanged. This is model-specific, not a general
-equivalence of daily and weekly forecasting.
-
-More history and more frequent updates did not necessarily improve April
-MAE. Near-zero bias can coexist with large absolute errors. April is now
-development data; retain a later unseen period for final evaluation. These
-schedule comparisons change both horizon and refresh frequency, so their
-separate effects have not been isolated.
+The fixed 28-day setup had the lowest April MAE among the 204 tested
+configurations. These are schedules of the same weekday-mean model family,
+not 204 different models. A lower bias does not necessarily mean a lower MAE.
+For overlapping forecast horizons, the benchmark scores each target day once
+using its latest issued forecast. The evaluator currently returns that selected
+daily table; it does not return the superseded long-horizon predictions.
+The [Project Diary](PROJECT_DIARY.md) records the full 20-run baseline table,
+a summary of the 184 additional schedules, and interpretation.
 
 ## Objectives
 
@@ -294,8 +228,10 @@ simulation assumptions.
 
 - `README.md` — project overview.
 - `PROJECT_DIARY.md` — progress, lessons learned, and next steps.
-- `inspect_data.py` - validated monthly loading, weekday-mean baselines, MAE/bias,
-  walk-forward evaluation, and the automated April baseline comparison table.
+- `data_loader.py` - validated monthly taxi/weather loading.
+- `mean_forecaster.py` - weekday-mean baselines, fit/predict, walk-forward
+  evaluation, MAE/bias, and comparison grids.
+- `inspect_data.py` - April experiment runner and learning exercises.
 - `taxi_checks.py` - trip-quality checks, month boundaries, and daily aggregation.
 - `weather_checks.py` - CSV inspection, weather checks, and monthly extraction.
 - `tests/test_metrics.py` - synthetic unit tests for MAE and forecast bias.

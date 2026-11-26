@@ -1,5 +1,56 @@
 # Project Diary
 
+## 2026-11-26 - Independent update schedules and latest-forecast scoring
+
+The learner separated three choices: the training `window` (days of past
+observations), the forecast `horizon` (future days issued per origin), and
+`update_every` (days between origins). The 20-configuration baseline still
+uses `update_every=horizon`; a separate method explores schedules where
+`update_every<horizon`. Values above the horizon are rejected because they
+leave target days without a forecast under the complete-daily-data assumption.
+
+Walk-forward evaluation now records target date, forecast origin, actual
+pickup count, and prediction for each issued forecast block. Overlapping
+blocks can forecast the same target more than once. After concatenation, it
+sorts by target and origin and keeps the latest origin per target date before
+calculating MAE and signed bias. The returned DataFrame contains those latest
+forecasts. This answers the performance of the refreshed daily decision
+stream; evaluating every issued long-horizon prediction would be a different
+question and requires retaining those rows separately.
+
+For the seven-day window, 28-day horizon, and 14-day update interval on April,
+46 forecasts were issued for 30 target days. The earlier all-issued metric was
+MAE 8,644.326087 and bias -853.717391, while latest-per-day scoring gives
+MAE 9,776.900000 and bias -1,559.966667. The latter equals the 14-day
+horizon/update result for this weekday-mean model: each refresh supersedes the
+remaining old predictions in the daily score. The assistant ran the revised
+walk-forward method on the actual January-April loader output and confirmed
+30 unique returned target dates and these latest metrics.
+
+The learner also rebuilt a temporary four-day example in `inspect_data.py` from
+simple all-history and windowed functions. Daily origins produced 4+3+2+1=10
+forecast rows; choosing the latest origin left four target days. This exercise
+clarified that a metric on latest daily forecasts measures the closest issued
+forecast for each day, even if earlier origins produced longer horizons.
+
+`compare_additional_update_schedules` adds 138 rolling configurations (three
+windows times 46 valid horizon/update pairs) and 46 expanding configurations
+without a training-window choice. The user ran it together with the original
+20: 204 rows with strategy, model, window, horizon, update interval, MAE, and
+bias. The lowest April MAE remained the fixed 28-day window at 6,408.908333
+with bias -2,041.408333. The next displayed configurations used the 28-day
+rolling window, including horizon/update 28/28 (MAE 6,513.483333) and
+28/27 (MAE 6,622.433333). These are weekday-mean schedules on April
+development data, not evidence of general performance on unseen periods.
+
+MAE measures errors in recorded daily pickups, not missed customers. It treats
+overprediction and underprediction equally in magnitude; signed bias records
+their average direction and can be small even with large daily errors. Fleet
+assignment needs regional and hourly forecasts plus explicit capacity and
+unmet-demand evaluation. Next: introduce SARIMA step by step and compare on
+matching target dates and forecast/update schedules. Forecasting functions
+and monthly loading still lack dedicated automated tests.
+
 ## 2026-11-26 - Class extraction and fit/predict comparison
 
 Extracted loading helpers into `data_loader.py` and introduced
@@ -8,7 +59,7 @@ Extracted loading helpers into `data_loader.py` and introduced
 The class still contains the older baseline and evaluation methods. Its
 20-configuration comparison does not yet use fit/predict internally.
 
-`inspect_data.py` now runs a focused experiment: seven-day training window,
+At this checkpoint, `inspect_data.py` ran a focused experiment: seven-day training window,
 28-day forecast horizon, and updates every 14 days. It loads January-April,
 fits only on history before each origin, and evaluates available April dates.
 The last blocks are truncated; overlapping forecasts retain origin and lead day.
@@ -27,11 +78,10 @@ answer different questions: all issued forecasts count overlapping targets
 multiple times, while latest-per-day evaluates one forecast per April date.
 This run is a regression comparison, not comprehensive automated test coverage.
 
-Resume by reviewing this experiment and the distinction between horizon and
-update interval. Then consolidate evaluation around fit/predict and simplify
-the class responsibilities before SARIMA. Constructor data and horizon remain
-from the transitional design; horizon is not used by fit/predict. The learner
-requested stopping for the night and committing this checkpoint.
+This checkpoint preceded the independent update-schedule work above.
+Constructor data and horizon remain from the transitional design; horizon
+is not used by fit/predict. The learner requested stopping for the night
+and committing that checkpoint.
 
 ## 2026-11-25 - Automated fixed, rolling, and expanding baseline comparison
 
