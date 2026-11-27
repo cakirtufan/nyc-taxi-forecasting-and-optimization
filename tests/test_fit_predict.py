@@ -33,7 +33,7 @@ def make_comparison_data():
 def test_fit_empty():
 
     forecaster = WeekdayMeanForecaster(
-        df=None, validation_df=None, window=None, horizon=None
+        observation_df=None, validation_df=None, window=None, horizon=None
         )
 
     history = pd.Series([], dtype=float)
@@ -44,7 +44,7 @@ def test_fit_empty():
 def test_fit_invalid_window():
 
     forecaster = WeekdayMeanForecaster(
-        df=None, validation_df=None, window=3, horizon=None
+        observation_df=None, validation_df=None, window=3, horizon=None
         )
 
     history, _ = make_synthetic_data()
@@ -56,7 +56,7 @@ def test_seven_day_window():
     train, target = make_synthetic_data()
 
     forecaster = WeekdayMeanForecaster(
-        df=None, validation_df=None, window=7, horizon=None
+        observation_df=None, validation_df=None, window=7, horizon=None
         )
 
     fit = forecaster.fit(train)
@@ -70,7 +70,7 @@ def test_train_mean():
     train, target = make_synthetic_data()
 
     forecaster = WeekdayMeanForecaster(
-        df=None, validation_df=None, window=None, horizon=None
+        observation_df=None, validation_df=None, window=None, horizon=None
         )
 
     fit = forecaster.fit(train)
@@ -83,7 +83,7 @@ def test_compare_forecasting_baseline_has_20_configurations():
     _, target, combined = make_comparison_data()
 
     forecaster = WeekdayMeanForecaster(
-            df=combined, validation_df=target, window=None, horizon=None
+            observation_df=combined, validation_df=target, window=None, horizon=None
             )
 
     df = forecaster.compare_forecasting_baseline()
@@ -97,7 +97,7 @@ def test_additional_update_schedules_has_184_configurations():
     _, target, combined = make_comparison_data()
 
     forecaster = WeekdayMeanForecaster(
-            df=combined, validation_df=target, window=None, horizon=None
+            observation_df=combined, validation_df=target, window=None, horizon=None
             )
 
     df = forecaster.compare_additional_update_schedules()

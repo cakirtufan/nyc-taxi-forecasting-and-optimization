@@ -4,7 +4,7 @@ import pytest
 import numpy as np
 
 forecaster = WeekdayMeanForecaster(
-        df=None, validation_df=None, window=None, horizon=None
+        observation_df=None, validation_df=None, window=None, horizon=None
         )
 
 def test_mae_and_bias():

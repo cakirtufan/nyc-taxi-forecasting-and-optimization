@@ -1,5 +1,127 @@
 # Project Diary
 
+## 2026-11-27 - SARIMA forecaster and ARIMA order walkthrough
+
+### Code and validation
+
+- Added `SARIMAForecaster` in `sarima_forecaster.py` with `order` and
+  `seasonal_order` parameters. `fit(history_df)` validates the input, sorts
+  `pickup_date`, creates a date-indexed `pickup_count` training series, fits
+  statsmodels `SARIMAX`, stores the fitted results, and returns `self`.
+  `predict(target_df)` requires a fitted model and forecasts
+  `len(target_df)` steps.
+- History validation checks required columns, empty input, datetime dates,
+  real numeric counts, missing values, non-finite counts, and duplicate
+  dates. Nine parametrized cases in `tests/test_sarima_forecaster.py` check
+  the expected `ValueError` or `TypeError` and message for these failures.
+  Successful fitting, forecast values, target-date alignment, and seasonal
+  behavior do not yet have dedicated SARIMA tests.
+- Updated `inspect_data.py` to import the new class and try a fit on
+  January-March history followed by an April forecast. It currently passes
+  `None` for both orders and prints the forecast index bounds and length;
+  this is an exploratory call, not a configured SARIMA comparison or an
+  accuracy result. Meaningful order choices and matching baseline evaluation
+  remain to be done.
+- Renamed weekday-baseline variables consistently in `mean_forecaster.py`:
+  `observation_df` for observed data, `target_df` for targets, and specific
+  names for available history, forecast origins, blocks, predictions, and
+  result tables. Updated callers and existing tests to use the renamed
+  constructor argument and method keywords. Corrected the walk-forward
+  docstring to describe latest-origin scoring.
+- All 20 tests passed locally using the Anaconda Python environment. The
+  default `python` on this machine did not have pytest installed; no CI run
+  for these new changes has been confirmed in this session.
+
+### Understanding the nonseasonal order
+
+The learner worked through `order=(p, d, q)` mathematically before moving to
+seasonal terms. Let \(y_t\) be the observed daily pickup count and
+\(z_t=\Delta^d y_t\) the series modeled by ARIMA.
+
+- **\(d\):** The number of successive differences. \(\Delta^0y_t=y_t\),
+  and \(\Delta^d y_t=\Delta^{d-1}y_t-\Delta^{d-1}y_{t-1}\). With \(d=1\),
+  the model forecasts a change in pickup counts; with \(d=2\), a change
+  in that change.
+- **\(p\):** The number of previous values of \(z\) used by the AR part.
+  \(\phi_1\) multiplies the most recent value \(z_{t-1}\), \(\phi_2\)
+  multiplies \(z_{t-2}\), and so on. The coefficient numbers count backward
+  from the forecast day.
+- **\(q\):** The number of previous forecast errors used by the MA part.
+  If \(\varepsilon_t=z_t-\hat z_{t|t-1}\), then \(q=2\) uses the errors
+  from the previous two dates. It does not mean calculating one error twice.
+
+For a one-step forecast, the conceptual structure is:
+
+\[
+\hat z_t
+=c+\sum_{i=1}^{p}\phi_i z_{t-i}
++\sum_{j=1}^{q}\theta_j\varepsilon_{t-j}.
+\]
+
+Differencing defines the series being modeled. The AR and MA parts
+contribute together to its forecast; they are not fitted one after the
+other. Coefficients are normally learned during fitting. An intercept \(c\)
+is included only when the model configuration specifies one; the current
+`SARIMAX` call does not explicitly request it.
+
+### Worked calculation: `order=(2, 3, 1)`
+
+The exercise forecasts day 9 from eight observed daily pickup counts.
+Seasonal parameters were not used in this hand calculation.
+
+| Day \(t\) | Pickup count \(y_t\) | First difference \(\Delta y_t\) | Second difference \(\Delta^2y_t\) | Third difference \(z_t=\Delta^3y_t\) |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 100 | — | — | — |
+| 2 | 105 | 5 | — | — |
+| 3 | 112 | 7 | 2 | — |
+| 4 | 122 | 10 | 3 | 1 |
+| 5 | 133 | 11 | 1 | -2 |
+| 6 | 148 | 15 | 4 | 3 |
+| 7 | 166 | 18 | 3 | -1 |
+| 8 | 189 | 23 | 5 | 2 |
+
+The exercise **supplied** the coefficients \(c=0\),
+\((\phi_1,\phi_2)=(2,-1)\), and \(\theta_1=0.5\). It also supplied the
+model's earlier forecast for the day 8 third difference:
+\(\hat z_{8|7}=4\). These coefficients and the earlier forecast were not
+estimated from the eight counts.
+
+The last forecast error was:
+
+\[
+\varepsilon_8=z_8-\hat z_{8|7}=2-4=-2.
+\]
+
+The AR contribution was \(2z_8-z_7=2(2)-(-1)=5\). The MA contribution
+was \(0.5\varepsilon_8=0.5(-2)=-1\). Thus, the day 9
+**third-difference** forecast was:
+
+\[
+\hat z_9=2z_8-z_7+0.5\varepsilon_8=5-1=4.
+\]
+
+A forecast of the third difference is not yet a pickup-count forecast.
+Undo each difference using the last observed second difference, first
+difference, and pickup count:
+
+\[
+\widehat{\Delta^2y_9}=\Delta^2y_8+\hat z_9=5+4=9,
+\]
+
+\[
+\widehat{\Delta y_9}=\Delta y_8+\widehat{\Delta^2y_9}=23+9=32,
+\]
+
+\[
+\hat y_9=y_8+\widehat{\Delta y_9}=189+32=\boxed{221}.
+\]
+
+**Learning checkpoint:** The learner independently calculated the AR
+contribution and the MA error contribution. The key distinction was that
+\(d=3\) produces a forecast of a third difference, which requires three
+reverse steps to recover the predicted pickup count. The seasonal
+parameters \((P,D,Q,s)\) remain the next topic.
+
 ## 2026-11-27 - Forecasting tests and GitHub Actions
 
 - Repaired the metric tests after `calculate_mae_and_bias` moved from the

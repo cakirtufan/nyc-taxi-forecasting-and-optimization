@@ -1,5 +1,6 @@
 import data_loader
 from mean_forecaster import WeekdayMeanForecaster
+from sarima_forecaster import SARIMAForecaster
 import pandas as pd
 
 january_df = data_loader.get_data_frame(2024,1)
@@ -13,16 +14,22 @@ train_df = combined_df[combined_df["pickup_date"] < april_df["pickup_date"].min(
 
 validation_df = combined_df[combined_df["pickup_date"] >= april_df["pickup_date"].min()]
 
-window = 14
-horizon = 14
-update_every = 14
+# window = 14
+# horizon = 14
+# update_every = 14
 
-forecaster = WeekdayMeanForecaster(
-    df=combined_df,
-    validation_df=validation_df,
-    window=window,
-    horizon=horizon
-)
+# forecaster = WeekdayMeanForecaster(
+#     observation_df=combined_df,
+#     validation_df=validation_df,
+#     window=window,
+#     horizon=horizon
+# )
 
-baseline = forecaster.compare_forecasting_baseline()
-additional_update_schedules = forecaster.compare_additional_update_schedules()     
+# baseline = forecaster.compare_forecasting_baseline()
+# additional_update_schedules = forecaster.compare_additional_update_schedules()
+
+sarima_forecaster = SARIMAForecaster(None, None)
+
+predicted = sarima_forecaster.fit(train_df).predict(validation_df)
+
+print(f"First day: {predicted.index.min()}, Last day: {predicted.index.max()}, Length: {len(predicted)}")
