@@ -35,32 +35,32 @@
 ### Understanding the nonseasonal order
 
 The learner worked through `order=(p, d, q)` mathematically before moving to
-seasonal terms. Let \(y_t\) be the observed daily pickup count and
-\(z_t=\Delta^d y_t\) the series modeled by ARIMA.
+seasonal terms. Let $y_t$ be the observed daily pickup count and
+$z_t=\Delta^d y_t$ the series modeled by ARIMA.
 
-- **\(d\):** The number of successive differences. \(\Delta^0y_t=y_t\),
-  and \(\Delta^d y_t=\Delta^{d-1}y_t-\Delta^{d-1}y_{t-1}\). With \(d=1\),
-  the model forecasts a change in pickup counts; with \(d=2\), a change
+- **$d$:** The number of successive differences. $\Delta^0y_t=y_t$,
+  and $\Delta^d y_t=\Delta^{d-1}y_t-\Delta^{d-1}y_{t-1}$. With $d=1$,
+  the model forecasts a change in pickup counts; with $d=2$, a change
   in that change.
-- **\(p\):** The number of previous values of \(z\) used by the AR part.
-  \(\phi_1\) multiplies the most recent value \(z_{t-1}\), \(\phi_2\)
-  multiplies \(z_{t-2}\), and so on. The coefficient numbers count backward
+- **$p$:** The number of previous values of $z$ used by the AR part.
+  $\phi_1$ multiplies the most recent value $z_{t-1}$, $\phi_2$
+  multiplies $z_{t-2}$, and so on. The coefficient numbers count backward
   from the forecast day.
-- **\(q\):** The number of previous forecast errors used by the MA part.
-  If \(\varepsilon_t=z_t-\hat z_{t|t-1}\), then \(q=2\) uses the errors
+- **$q$:** The number of previous forecast errors used by the MA part.
+  If $\varepsilon_t=z_t-\hat z_{t|t-1}$, then $q=2$ uses the errors
   from the previous two dates. It does not mean calculating one error twice.
 
 For a one-step forecast, the conceptual structure is:
 
-\[
+$$
 \hat z_t
 =c+\sum_{i=1}^{p}\phi_i z_{t-i}
 +\sum_{j=1}^{q}\theta_j\varepsilon_{t-j}.
-\]
+$$
 
 Differencing defines the series being modeled. The AR and MA parts
 contribute together to its forecast; they are not fitted one after the
-other. Coefficients are normally learned during fitting. An intercept \(c\)
+other. Coefficients are normally learned during fitting. An intercept $c$
 is included only when the model configuration specifies one; the current
 `SARIMAX` call does not explicitly request it.
 
@@ -69,7 +69,7 @@ is included only when the model configuration specifies one; the current
 The exercise forecasts day 9 from eight observed daily pickup counts.
 Seasonal parameters were not used in this hand calculation.
 
-| Day \(t\) | Pickup count \(y_t\) | First difference \(\Delta y_t\) | Second difference \(\Delta^2y_t\) | Third difference \(z_t=\Delta^3y_t\) |
+| Day $t$ | Pickup count $y_t$ | First difference $\Delta y_t$ | Second difference $\Delta^2y_t$ | Third difference $z_t=\Delta^3y_t$ |
 | ---: | ---: | ---: | ---: | ---: |
 | 1 | 100 | — | — | — |
 | 2 | 105 | 5 | — | — |
@@ -80,47 +80,47 @@ Seasonal parameters were not used in this hand calculation.
 | 7 | 166 | 18 | 3 | -1 |
 | 8 | 189 | 23 | 5 | 2 |
 
-The exercise **supplied** the coefficients \(c=0\),
-\((\phi_1,\phi_2)=(2,-1)\), and \(\theta_1=0.5\). It also supplied the
+The exercise **supplied** the coefficients $c=0$,
+$(\phi_1,\phi_2)=(2,-1)$, and $\theta_1=0.5$. It also supplied the
 model's earlier forecast for the day 8 third difference:
-\(\hat z_{8|7}=4\). These coefficients and the earlier forecast were not
+$\hat z_{8|7}=4$. These coefficients and the earlier forecast were not
 estimated from the eight counts.
 
 The last forecast error was:
 
-\[
+$$
 \varepsilon_8=z_8-\hat z_{8|7}=2-4=-2.
-\]
+$$
 
-The AR contribution was \(2z_8-z_7=2(2)-(-1)=5\). The MA contribution
-was \(0.5\varepsilon_8=0.5(-2)=-1\). Thus, the day 9
+The AR contribution was $2z_8-z_7=2(2)-(-1)=5$. The MA contribution
+was $0.5\varepsilon_8=0.5(-2)=-1$. Thus, the day 9
 **third-difference** forecast was:
 
-\[
+$$
 \hat z_9=2z_8-z_7+0.5\varepsilon_8=5-1=4.
-\]
+$$
 
 A forecast of the third difference is not yet a pickup-count forecast.
 Undo each difference using the last observed second difference, first
 difference, and pickup count:
 
-\[
+$$
 \widehat{\Delta^2y_9}=\Delta^2y_8+\hat z_9=5+4=9,
-\]
+$$
 
-\[
+$$
 \widehat{\Delta y_9}=\Delta y_8+\widehat{\Delta^2y_9}=23+9=32,
-\]
+$$
 
-\[
+$$
 \hat y_9=y_8+\widehat{\Delta y_9}=189+32=\boxed{221}.
-\]
+$$
 
 **Learning checkpoint:** The learner independently calculated the AR
 contribution and the MA error contribution. The key distinction was that
-\(d=3\) produces a forecast of a third difference, which requires three
+$d=3$ produces a forecast of a third difference, which requires three
 reverse steps to recover the predicted pickup count. The seasonal
-parameters \((P,D,Q,s)\) remain the next topic.
+parameters $(P,D,Q,s)$ remain the next topic.
 
 ## 2026-11-27 - Forecasting tests and GitHub Actions
 
